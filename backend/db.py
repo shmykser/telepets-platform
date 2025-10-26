@@ -21,7 +21,10 @@ if async_database_url.startswith("postgresql+asyncpg://"):
     hostname = parsed.hostname or ""
     is_external_host = "." in hostname  # внутренние хосты Render вида 'dpg-xxxxx' без точки
     if is_external_host:
+        # Для Supabase pooler: отключаем проверку сертификата
         ssl_context = ssl.create_default_context(cafile=certifi.where())
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
         connect_args = {"ssl": ssl_context}
 
 engine = create_async_engine(
