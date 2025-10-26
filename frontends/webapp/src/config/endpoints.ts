@@ -56,13 +56,13 @@ const PROD_CONFIG = {
   
   // Backend API (Render)
   api: {
-    url: 'https://telepets-api-gts3.onrender.com/api', // Render Web Service
+    url: 'https://telepets-api-docker.onrender.com/api', // Render Web Service
     directBackendUrl: '', // Не используется в prod
   },
   
   // Static assets (через Render API)
   petImages: {
-    url: 'https://telepets-api-gts3.onrender.com/pet-images',
+    url: 'https://telepets-api-docker.onrender.com/pet-images',
   },
 } as const
 
