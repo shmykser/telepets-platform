@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Thief - Direct Launch</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+        }
+        #game {
+            width: 100vw;
+            height: 100vh;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game"></div>
+    <div class="loading" id="loading">
+        <div>Загрузка игры...</div>
+        <div style="margin-top: 10px; font-size: 12px;">Pet Thief Scene</div>
+    </div>
+
+    <script type="module">
+        import('/games/petthief-direct.js').then(() => {
+            // Проверяем, что модули загружены
+            if (!window.Phaser || !window.PetThiefScene) {
+                console.error('❌ [Direct Launch] Модули не загружены');
+                document.getElementById('loading').innerHTML = 'Ошибка загрузки модулей';
+                return;
+            }
+            
+            // Получаем параметры из URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const petName = urlParams.get('pet_name') || 'Test Pet';
+            const userId = urlParams.get('user_id') || 'test_user';
+            const gameType = urlParams.get('game_type') || 'pet_thief';
+            
+            console.log('🎮 [Direct Launch] Параметры:', { petName, userId, gameType });
+            
+            // Конфигурация Phaser для прямого запуска PetThiefScene
+            const config = {
+                type: window.Phaser.CANVAS, // Используем Canvas для стабильности
+                backgroundColor: '#2c3e50',
+                scale: {
+                    mode: window.Phaser.Scale.RESIZE,
+                    autoCenter: window.Phaser.Scale.CENTER_BOTH,
+                    width: 800,
+                    height: 600,
+                    parent: 'game',
+                    min: {
+                        width: 320,
+                        height: 240
+                    },
+                    max: {
+                        width: 1920,
+                        height: 1080
+                    }
+                },
+                physics: {
+                    default: 'arcade',
+                    arcade: {
+                        gravity: { y: 0 },
+                        debug: false
+                    }
+                },
+                input: {
+                    activePointers: 3,
+                    smoothFactor: 0.5
+                },
+                scene: [window.PetThiefScene],
+                render: {
+                    pixelArt: false,
+                    antialias: true
+                }
+            };
+            
+            // Создаем игру
+            const game = new window.Phaser.Game(config);
+            
+            // Запускаем сцену с данными
+            game.scene.start('PetThiefScene', {
+                petName: petName,
+                userId: userId,
+                gameType: gameType
+            });
+            
+            // Скрываем загрузочный экран после запуска
+            game.events.once('ready', () => {
+                document.getElementById('loading').style.display = 'none';
+                console.log('🎮 [Direct Launch] Игра запущена');
+            });
+            
+            // Обработка ошибок
+            game.events.on('error', (error) => {
+                console.error('❌ [Direct Launch] Ошибка игры:', error);
+                document.getElementById('loading').innerHTML = 'Ошибка загрузки игры';
+            });
+        }).catch(error => {
+            console.error('❌ [Direct Launch] Ошибка загрузки модуля:', error);
+            document.getElementById('loading').innerHTML = 'Ошибка загрузки модуля';
+        });
+    </script>
+</body>
+</html>

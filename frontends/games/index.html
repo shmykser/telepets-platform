@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1, minimum-scale=1" />
+    <title>Telepets Mini Games</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?57"></script>
+    
+    <style>
+      /**
+       * Fullscreen игра - Best practices
+       * - 100% ширина и высота без ограничений
+       * - Учет safe-area для iOS (notch, Dynamic Island)
+       * - Предотвращение zoom, scroll, overscroll
+       * - Оптимизация для touch устройств
+       */
+      
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      html {
+        width: 100%;
+        height: 100%;
+        /* Предотвращение zoom при двойном тапе */
+        touch-action: manipulation;
+        /* iOS: предотвращение bounce эффекта */
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      body {
+        width: 100%;
+        height: 100%;
+        /* Убираем все отступы и скролл */
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        position: fixed;
+        /* Фон игры */
+        background: #0b1221;
+        /* Touch оптимизация */
+        touch-action: manipulation;
+        overscroll-behavior: none;
+        /* Предотвращение выделения текста */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        /* Предотвращение tap highlight */
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      #game {
+        /* Заполняем весь экран */
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height для iOS */
+        /* Убираем flex - пусть Phaser сам управляет размещением */
+        display: block;
+        position: relative;
+        /* Скрываем overflow для предотвращения скролла */
+        overflow: hidden;
+      }
+      
+      canvas {
+        /* Canvas заполняет родителя */
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        /* object-fit: cover убирает черные полосы, но может обрезать края */
+        /* object-fit: contain сохраняет пропорции с возможными черными полосами */
+        /* Используем contain т.к. Phaser.Scale.FIT уже управляет этим */
+        object-fit: contain;
+        /* Touch оптимизация */
+        touch-action: none;
+      }
+      
+      /* iOS: скрытие системных UI элементов в fullscreen */
+      @supports (-webkit-touch-callout: none) {
+        body {
+          /* Учитываем safe-area для iPhone с вырезом */
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        #game {
+          /* Компенсируем padding для полного использования экрана */
+          height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+          height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        }
+      }
+      
+      /* Адаптация для разных ориентаций */
+      @media (orientation: landscape) {
+        body {
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+      }
+      
+      /* Оптимизация для малых экранов */
+      @media (max-width: 480px) {
+        #game {
+          /* Убеждаемся что используем весь экран */
+          min-height: 100vh;
+          min-height: 100dvh;
+        }
+      }
+      
+      /* Скрытие cursor при игре на touch устройствах */
+      @media (pointer: coarse) {
+        canvas {
+          cursor: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    
+    <script>
+      /**
+       * Предзагрузочная инициализация Telegram WebApp
+       * Выполняется ДО загрузки Phaser для правильной настройки viewport
+       */
+      (function() {
+        console.log('🚀 [Init] Telegram WebApp pre-initialization');
+        
+        if (window.Telegram?.WebApp) {
+          const tg = window.Telegram.WebApp;
+          
+          // Разворачиваем viewport на максимум
+          if (!tg.isExpanded) {
+            tg.expand();
+            console.log('📱 [Init] Viewport expanded');
+          }
+          
+          // Блокируем вертикальные свайпы для предотвращения закрытия
+          try {
+            if (typeof tg.disableVerticalSwipes === 'function') {
+              tg.disableVerticalSwipes();
+              console.log('🔒 [Init] Vertical swipes disabled');
+            }
+          } catch (e) {
+            console.warn('⚠️ [Init] Could not disable vertical swipes:', e);
+          }
+          
+          // Настройка цветов для fullscreen
+          try {
+            if (typeof tg.setHeaderColor === 'function') {
+              tg.setHeaderColor('#0b1221');
+            }
+            if (typeof tg.setBackgroundColor === 'function') {
+              tg.setBackgroundColor('#0b1221');
+            }
+          } catch (e) {
+            console.warn('⚠️ [Init] Could not set colors:', e);
+          }
+          
+          console.log('✅ [Init] Telegram WebApp initialized');
+        } else {
+          console.log('🌐 [Init] Running in browser mode (no Telegram WebApp)');
+        }
+        
+        // Предотвращение pull-to-refresh на мобильных
+        document.body.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 1) {
+            // Разрешаем multi-touch для игры
+            return;
+          }
+          // Предотвращаем single-touch scroll
+          e.preventDefault();
+        }, { passive: false });
+        
+        console.log('✅ [Init] Touch handlers installed');
+      })();
+    </script>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
