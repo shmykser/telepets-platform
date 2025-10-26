@@ -99,6 +99,7 @@ app.add_middleware(
         "http://localhost:3001",
         "http://127.0.0.1:3001",
         "https://telepets-frontend.onrender.com",
+        "https://shmykser.github.io",  # GitHub Pages
     ],
     allow_credentials=True,
     allow_methods=["*"],

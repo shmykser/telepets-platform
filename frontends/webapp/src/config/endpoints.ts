@@ -38,31 +38,31 @@ const DEV_CONFIG = {
 } as const
 
 /**
- * Production endpoints (через Nginx)
+ * Production endpoints (GitHub Pages + Render)
  */
 const PROD_CONFIG = {
   // WebApp
   webapp: {
-    url: '', // Относительный путь (same origin)
-    port: 80, // Nginx
+    url: 'https://shmykser.github.io/telepets-platform/', // GitHub Pages
+    port: 443,
   },
   
   // Games (Phaser)
   games: {
-    url: '', // Относительный путь (same origin)
-    port: 80, // Nginx
+    url: 'https://shmykser.github.io/telepets-platform/games/', // GitHub Pages
+    port: 443,
     basePath: '/games/',
   },
   
-  // Backend API (через Nginx)
+  // Backend API (Render)
   api: {
-    url: '/api', // Относительный путь через Nginx
+    url: 'https://telepets-api.onrender.com/api', // Render Web Service
     directBackendUrl: '', // Не используется в prod
   },
   
-  // Static assets
+  // Static assets (через Render API)
   petImages: {
-    url: '/pet-images', // Относительный путь через Nginx
+    url: 'https://telepets-api.onrender.com/pet-images',
   },
 } as const
 
