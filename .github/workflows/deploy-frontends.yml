@@ -60,13 +60,11 @@ jobs:
       - name: Prepare deployment directory
         run: |
           mkdir -p _site
-          # Копируем webapp в корень
+          # Копируем webapp в корень (включая index.html от React)
           cp -r frontends/webapp/dist/* _site/
           # Копируем games в /games
           mkdir -p _site/games
           cp -r frontends/games/dist/* _site/games/
-          # Создаем index.html в корне который редиректит на /webapp (опционально)
-          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=./index.html"></head><body><p>Redirecting...</p></body></html>' > _site/index.html
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
