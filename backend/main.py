@@ -157,18 +157,20 @@ async def time_test():
         "stage_transition_interval": STAGE_TRANSITION_INTERVAL
     }
 
-# Подключение роутеров
-app.include_router(create.router)
-app.include_router(health_up.router)
-app.include_router(summary.router)
-app.include_router(economy.router)
+# Подключение роутеров с префиксом /api
+app.include_router(create.router, prefix="/api")
+app.include_router(health_up.router, prefix="/api")
+app.include_router(summary.router, prefix="/api")
+app.include_router(economy.router, prefix="/api")
+app.include_router(auth_api.router, prefix="/api")
+app.include_router(market.router, prefix="/api")
+app.include_router(user_profile.router, prefix="/api")
+app.include_router(games.router, prefix="/api/games", tags=["games"])
+
+# Служебные роутеры (без /api префикса)
 app.include_router(monitoring.router)
 app.include_router(debug.router)
 app.include_router(pet_images.router)
-app.include_router(auth_api.router)
-app.include_router(market.router)
-app.include_router(user_profile.router)
-app.include_router(games.router, prefix="/games", tags=["games"])
 
 # Добавляем мониторинг middleware после всех определений
 app = MonitoringMiddleware(app)
