@@ -21,7 +21,7 @@ export default defineConfig({
     },
     build: {
         target: 'es2020',
-        sourcemap: true,
+        sourcemap: false, // Отключаем для production
         rollupOptions: {
             input: {
                 main: 'index.html',
@@ -34,5 +34,5 @@ export default defineConfig({
             }
         }
     },
-    base: '/games/'
+    base: '/games/' // Относительный путь для GitHub Pages
 });
