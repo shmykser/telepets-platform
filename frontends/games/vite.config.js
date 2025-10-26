@@ -34,5 +34,5 @@ export default defineConfig({
             }
         }
     },
-    base: '/games/' // Относительный путь для GitHub Pages
+    base: '/telepets-platform/games/' // Полный путь для GitHub Pages
 });
