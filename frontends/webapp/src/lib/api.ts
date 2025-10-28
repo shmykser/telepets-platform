@@ -14,10 +14,10 @@ import type {
   UpdateProfileRequest,
   PublicUserInfo
 } from '@/types'
-import { CONFIG } from '@/config/endpoints'
+import { CONFIG, buildUrl } from '@/config/endpoints'
 
-// Используем централизованную конфигурацию
-const API_BASE_URL = CONFIG.api.url
+// Используем централизованную конфигурацию с правильным /api префиксом
+const API_BASE_URL = buildUrl.api()
 
 // Базовый клиент для всех запросов
 const api = axios.create({
