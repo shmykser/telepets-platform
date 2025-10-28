@@ -27,7 +27,7 @@ const DEV_CONFIG = {
   
   // Backend API (напрямую или через Vite proxy)
   api: {
-    url: 'http://localhost:8080/api', // Через Nginx в dev тоже
+    url: 'http://localhost:8080', // БЕЗ /api - он добавляется в роутерах
     directBackendUrl: 'http://localhost:3000', // Прямой доступ к backend (для проксирования Vite)
   },
   
@@ -56,7 +56,7 @@ const PROD_CONFIG = {
   
   // Backend API (Render)
   api: {
-    url: 'https://telepets-api-docker.onrender.com/api', // Render Web Service
+    url: 'https://telepets-api-docker.onrender.com', // БЕЗ /api - он добавляется в роутерах
     directBackendUrl: '', // Не используется в prod
   },
   
@@ -98,7 +98,9 @@ export const buildUrl = {
     const apiBase = CONFIG.api.url
     // Убираем начальный слеш если он есть
     const cleanPath = path.startsWith('/') ? path.slice(1) : path
-    return cleanPath ? `${apiBase}/${cleanPath}` : apiBase
+    // Добавляем /api префикс для всех запросов
+    const apiPath = cleanPath ? `/api/${cleanPath}` : '/api'
+    return `${apiBase}${apiPath}`
   },
   
   /**
