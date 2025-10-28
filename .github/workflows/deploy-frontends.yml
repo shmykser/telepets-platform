@@ -39,11 +39,11 @@ jobs:
         working-directory: frontends/webapp
         run: npm ci
       
-      - name: Build WebApp
+      - name: Build WebApp (without games)
         working-directory: frontends/webapp
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://telepets-api.onrender.com' }}
-        run: npm run build
+        run: npm run vite build
       
       # Build Games
       - name: Install Games dependencies
