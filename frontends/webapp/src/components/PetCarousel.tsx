@@ -3,6 +3,7 @@ import { useEffect, useCallback, useMemo } from 'react'
 import PetCard from '@/components/PetCard'
 import type { Pet } from '@/types'
 import { getStoredUserId } from '@/utils'
+import { buildUrl } from '@/config/endpoints'
 
 interface PetCarouselProps {
   pets: Pet[]
@@ -34,7 +35,7 @@ export default function PetCarousel({
   const normalizedPets: Pet[] = useMemo(() => (
     pets.map(p => ({
       ...p,
-      image_url: p.image_url || `/pet-images/${userId}/${encodeURIComponent(p.name || '')}?stage=${p.state}`,
+      image_url: p.image_url || buildUrl.petImage(userId, p.name || '') + `?stage=${p.state}`,
     }))
   ), [pets, userId])
 

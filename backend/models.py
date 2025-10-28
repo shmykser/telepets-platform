@@ -159,7 +159,7 @@ class Auction(Base):
     min_increment_abs = Column(Integer, nullable=True)
     min_increment_pct = Column(Integer, nullable=True)
     soft_close_seconds = Column(Integer, nullable=False, default=60)
-    status = Column(Enum(AuctionStatus), nullable=False, default=AuctionStatus.active)
+    status = Column(Enum(AuctionStatus, name='auction_status'), nullable=False, default=AuctionStatus.active)
     current_winner_user_id = Column(String, ForeignKey('users.user_id'), nullable=True)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     end_time = Column(DateTime(timezone=True), nullable=False)
