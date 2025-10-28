@@ -5,7 +5,7 @@ export function cn(...classes: Array<string | undefined | false | null>): string
 }
 
 export function getStoredUserId(): string {
-  if (typeof localStorage === 'undefined') return 'default_user';
+  if (typeof localStorage === 'undefined') return '273065571';
   
   // Сначала проверяем localStorage
   const storedUserId = localStorage.getItem('user_id')
@@ -19,13 +19,34 @@ export function getStoredUserId(): string {
     return testUserId
   }
   
-  // Если ничего нет, используем default_user
-  return 'default_user';
+  // Временная заглушка: используем вашу учетку для тестирования
+  // В Telegram WebApp это будет заменено на реального пользователя
+  return '273065571';
 }
 
 export function setStoredUserId(userId: string): void {
   try {
     localStorage.setItem('user_id', userId);
+  } catch {}
+}
+
+export function getStoredUsername(): string {
+  if (typeof localStorage === 'undefined') return 'Shmykser';
+  
+  // Сначала проверяем localStorage
+  const storedUsername = localStorage.getItem('username')
+  if (storedUsername) {
+    return storedUsername
+  }
+  
+  // Временная заглушка: используем ваш username для тестирования
+  // В Telegram WebApp это будет заменено на реального пользователя
+  return 'Shmykser';
+}
+
+export function setStoredUsername(username: string): void {
+  try {
+    localStorage.setItem('username', username);
   } catch {}
 }
 

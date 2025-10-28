@@ -6,9 +6,19 @@ import Notification from '@/components/Notification'
 import App from './App.tsx'
 import './index.css'
 import { initializeFonts } from '@/utils/fonts'
+import { setStoredUserId, setStoredUsername } from '@/utils'
 
 // Инициализируем шрифты для предотвращения зависания
 initializeFonts();
+
+// Временная заглушка: автоматически устанавливаем тестового пользователя
+// В Telegram WebApp это будет заменено на реального пользователя
+if (!localStorage.getItem('user_id')) {
+  setStoredUserId('273065571');
+}
+if (!localStorage.getItem('username')) {
+  setStoredUsername('Shmykser');
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

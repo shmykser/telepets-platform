@@ -15,6 +15,7 @@ import type {
   PublicUserInfo
 } from '@/types'
 import { CONFIG, buildUrl } from '@/config/endpoints'
+import { getStoredUsername } from '@/utils'
 
 // Используем централизованную конфигурацию с правильным /api префиксом
 const API_BASE_URL = buildUrl.api()
@@ -55,8 +56,8 @@ api.interceptors.request.use(
     if (!token && !isIssuingToken) {
       try {
         isIssuingToken = true
-        const userId = localStorage.getItem('user_id') || 'default_user'
-        const username = localStorage.getItem('username') || undefined
+        const userId = localStorage.getItem('user_id') || '273065571'
+        const username = getStoredUsername()
         const params: any = { user_id: userId }
         if (username) params.username = username
         const resp = await authClient.post(AUTH_TOKEN_PATH, null, { params })
