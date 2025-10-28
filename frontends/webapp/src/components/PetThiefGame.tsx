@@ -127,13 +127,9 @@ export default function PetThiefGame({ pet, onGameEnd, onClose }: PetThiefGamePr
         const iframe = document.createElement('iframe')
         iframeRef.current = iframe
         
-        // Используем централизованную конфигурацию эндпоинтов
-        const { buildUrl } = await import('@/config/endpoints')
-        const gameUrl = buildUrl.game({
-          pet_name: pet.name || '',
-          user_id: pet.user_id || '',
-          game_type: 'pet_thief'
-        })
+        // Временное решение: используем прямую ссылку на игру
+        // TODO: Интегрировать игры в основное приложение
+        const gameUrl = `https://shmykser.github.io/telepets-platform/games/petthief.html?pet_name=${encodeURIComponent(pet.name || '')}&user_id=${encodeURIComponent(pet.user_id || '')}&game_type=pet_thief`
         
         console.log('🎮 [PetThiefGame] Loading game from:', gameUrl)
         iframe.src = gameUrl

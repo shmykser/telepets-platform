@@ -47,11 +47,11 @@ const PROD_CONFIG = {
     port: 443,
   },
   
-  // Games (Phaser)
+  // Games (Phaser) - интегрированы в основное приложение
   games: {
-    url: 'https://shmykser.github.io/telepets-platform/games/', // GitHub Pages
+    url: 'https://shmykser.github.io/telepets-platform/', // GitHub Pages
     port: 443,
-    basePath: '/games/',
+    basePath: '/games/', // Относительный путь внутри приложения
   },
   
   // Backend API (Render)
