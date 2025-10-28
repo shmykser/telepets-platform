@@ -271,3 +271,5 @@ render blueprint deploy render.yaml
 
 **Статус:** Backend готов к деплою, требуется добавить карту на Render! 🚀
 
+
+

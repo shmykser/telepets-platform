@@ -1,4 +1,4 @@
-# 🚀 План публикации Telepets Platform
+xnj # 🚀 План публикации Telepets Platform
 
 ## 📊 Анализ текущей архитектуры
 

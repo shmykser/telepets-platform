@@ -293,3 +293,5 @@ curl http://localhost:10000/monitoring/health
 
 Следуйте инструкции выше и через 10 минут backend будет работать! 🚀
 
+
+

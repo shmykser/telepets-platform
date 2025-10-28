@@ -222,3 +222,5 @@ LIMIT 10;
 
 Следующий шаг: настройте backend на Render с полученным CONNECTION_STRING.
 
+
+

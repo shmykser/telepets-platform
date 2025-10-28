@@ -104,3 +104,4 @@ alembic/versions/__pycache__/
 *.key
 *.crt
 secrets/
+backend/test_data.json
