@@ -160,7 +160,8 @@ export function useCoinBalance(explicitCoins?: number) {
 
 export function useAuctions(status: string = 'active', page: number = 1, pageSize: number = 20) {
   const { data, isLoading, error, refetch } = useQuery(['auctions', status, page, pageSize], () => marketApi.listAuctions({ status, page, page_size: pageSize }), {
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Обновляем раз в 30 секунд вместо 5 (слишком часто)
+    staleTime: 15000, // Данные считаются свежими 15 секунд
   })
   return { auctions: (data?.items || []) as Auction[], page: data?.page || page, pageSize: data?.page_size || pageSize, isLoading, error, refetch }
 }
@@ -172,7 +173,7 @@ export function usePlaceBid() {
     async ({ auctionId, amount }: { auctionId: number; amount: number }) => {
       let token = localStorage.getItem('auth_token')
       if (!token) {
-        const username = localStorage.getItem('username')
+        const username = localStorage.getItem('username') ?? undefined
         const res = await authApi.issueToken(userId, username)
         token = res.access_token
         localStorage.setItem('auth_token', token)
@@ -199,7 +200,7 @@ export function useCreateAuction() {
     async ({ petId, startPrice, durationSeconds, buyNowPrice }: { petId: number; startPrice: number; durationSeconds?: number; buyNowPrice?: number }) => {
       let token = localStorage.getItem('auth_token')
       if (!token) {
-        const username = localStorage.getItem('username')
+        const username = localStorage.getItem('username') ?? undefined
         const res = await authApi.issueToken(userId, username)
         token = res.access_token
         localStorage.setItem('auth_token', token)
@@ -226,7 +227,7 @@ export function useBuyNow() {
     async ({ auctionId }: { auctionId: number }) => {
       let token = localStorage.getItem('auth_token')
       if (!token) {
-        const username = localStorage.getItem('username')
+        const username = localStorage.getItem('username') ?? undefined
         const res = await authApi.issueToken(userId, username)
         token = res.access_token
         localStorage.setItem('auth_token', token)

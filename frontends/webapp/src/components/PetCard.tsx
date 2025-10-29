@@ -41,10 +41,11 @@ export default function PetCard({
   const [showGame, setShowGame] = useState(false)
   const navigate = useNavigate()
   // Ищем активный аукцион для этого питомца
+  // Используем общий query key для всех питомцев, чтобы не делать множественные запросы
   const { data: activeAuctionsData } = useQuery(
-    ['activeAuctionsForPet', pet.id],
+    ['auctions', 'active', 1, 200],
     () => marketApi.listAuctions({ status: 'active', page: 1, page_size: 200 }),
-    { refetchInterval: 5000, staleTime: 3000 }
+    { refetchInterval: 30000, staleTime: 15000 } // Обновляем раз в 30 секунд вместо 5
   )
   const activeAuction = useMemo(() => {
     const items = (activeAuctionsData?.items || []) as any[]
