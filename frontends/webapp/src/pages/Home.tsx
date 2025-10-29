@@ -150,8 +150,13 @@ export default function Home() {
     )
   }
 
+  // Проверяем, есть ли питомцы в allPets, даже если pet.status === 'no_pets'
+  // Это решает проблему, когда данные ещё загружаются или есть рассинхрон между /summary и /summary/all
+  const hasPetsData = Array.isArray(allPets) && allPets.length > 0
+
   // Обработка статусов от API
-  if (!pet || pet.status === 'no_pets') {
+  // Показываем Welcome только если точно нет питомцев И загрузка завершена
+  if ((!pet || pet.status === 'no_pets') && !hasPetsData && !allLoading) {
     if (showCreateForm) {
       return (
         <div className="max-w-2xl mx-auto">
@@ -176,7 +181,7 @@ export default function Home() {
   }
 
   // Флаг: все питомцы мертвы — продолжаем показывать основной интерфейс, но добавим баннер
-  const allDead = pet.status === 'all_dead'
+  const allDead = pet?.status === 'all_dead'
   const hasAlive = Array.isArray(allPets) && allPets.some((p: any) => (p.status || p.life_status) !== 'dead')
 
 
@@ -187,8 +192,8 @@ export default function Home() {
       {allDead && !showCreateForm && !isCreatingPending && !hasAlive && (
         <div className="max-w-2xl mx-auto">
           <AllDead
-            totals={{ total_pets: pet.total_pets, dead_pets: pet.dead_pets || 0 }}
-            message={pet.message}
+            totals={{ total_pets: pet?.total_pets || 0, dead_pets: pet?.dead_pets || 0 }}
+            message={pet?.message}
             onCreateClick={() => setShowCreateForm(true)}
           />
         </div>
@@ -224,23 +229,23 @@ export default function Home() {
       {/* Кнопка "Помощь питомцу" удалена — функционал в карточке */}
 
       
-      {/* Quick Stats */}
+      {/* Quick Stats - используем данные из pet, если доступны, иначе из allPets/wallet */}
       <QuickStats
         items={[ 'coins', 'alivePets', 'deadPets', 'totalPets']}
         //itemSpans={{ status: 2 }}
         data={{
-          totalPets: pet.total_pets || 0,
-          alivePets: pet.alive_pets,
-          deadPets: pet.dead_pets,
-          coins: pet.wallet?.coins,
-          //statusText: pet.status === 'success' ? 'живой' : (pet.status ?? '—'),
+          totalPets: pet?.total_pets || (hasPetsData ? allPets.length : 0) || 0,
+          alivePets: pet?.alive_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) !== 'dead').length : 0) || 0,
+          deadPets: pet?.dead_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) === 'dead').length : 0) || 0,
+          coins: pet?.wallet?.coins || liveWallet?.coins || wallet?.coins || 0,
+          //statusText: pet?.status === 'success' ? 'живой' : (pet?.status ?? '—'),
         }}
         columns={4}
         size="sm"
       />
 
-      {/* Карусель с карточками питомцев доступна всегда, если есть питомцы (даже если все мертвы) */}
-      {!allLoading && allPets && allPets.length > 0 && (
+      {/* Карусель с карточками питомцев - показываем если есть данные из allPets, даже при pet.status === 'no_pets' */}
+      {!allLoading && hasPetsData && (
         <PetCarousel
           pets={allPets}
           onSelect={() => {}}
