@@ -170,7 +170,8 @@ app.include_router(games.router, prefix="/api/games", tags=["games"])
 # Служебные роутеры (без /api префикса)
 app.include_router(monitoring.router)
 app.include_router(debug.router)
-app.include_router(pet_images.router)
+# Pet images роутер должен быть доступен по /api/pet-images для консистентности с другими API
+app.include_router(pet_images.router, prefix="/api")
 
 # Добавляем мониторинг middleware после всех определений
 app = MonitoringMiddleware(app)
