@@ -44,9 +44,10 @@ async def lifespan(app: FastAPI):
             from alembic.config import Config as AlembicConfig
             from alembic import command as alembic_command
 
-            project_root = Path(__file__).resolve().parents[1]
-            alembic_ini = project_root / "alembic.ini"
-            alembic_dir = project_root / "alembic"
+            # В контейнере backend является рабочей директорией; берём пути относительно backend/
+            backend_dir = Path(__file__).resolve().parent
+            alembic_ini = backend_dir / "alembic.ini"
+            alembic_dir = backend_dir / "alembic"
 
             cfg = AlembicConfig(str(alembic_ini))
             cfg.set_main_option("script_location", str(alembic_dir))
