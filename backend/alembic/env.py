@@ -31,7 +31,8 @@ BACKEND_DIR = PROJECT_ROOT / 'backend'
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from models import Base  # noqa: E402
+# Импортируем модели явно через пакет `backend`, чтобы избежать конфликтов с сторонними пакетами `models`
+from backend.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
