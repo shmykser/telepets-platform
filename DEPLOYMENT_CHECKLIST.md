@@ -1,275 +1,163 @@
-# ✅ Чеклист деплоя Telepets Platform
+# Чеклист деплоя на Production
 
-> Используйте этот чеклист для отслеживания прогресса деплоя
+## ✅ Выполнено
 
----
+- [x] Анализ всех изменений между dev и production
+- [x] Добавлена зависимость `boto3>=1.34.0` в requirements.txt
+- [x] Все изменения закоммичены
+- [x] Код запушен в origin/master
+- [x] Создана документация по деплою (DEPLOYMENT_PLAN_PROD.md)
+- [x] Создан справочник переменных окружения (ENV_VARIABLES_PROD.md)
 
-## 📋 Подготовка (5 минут)
+## 🔄 Требуется выполнить вручную
 
-- [ ] Прочитать [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)
-- [ ] Прочитать [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-- [ ] Зарегистрироваться на [Render](https://render.com)
-- [ ] Иметь GitHub аккаунт
-- [ ] Иметь Telegram бот (создать через @BotFather)
+### 1. Настройка переменных окружения в Render
 
----
+**Важно:** Все переменные нужно добавить в Render Dashboard → Ваш Backend сервис → Environment
 
-## 🔧 Локальное тестирование (опционально, 10 минут)
+#### Cloudflare R2 (обязательно):
+```
+R2_ACCOUNT_ID=<ваш-account-id>
+R2_ACCESS_KEY_ID=<ваш-access-key-id>
+R2_SECRET_ACCESS_KEY=<ваш-secret-access-key>
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_BUCKET=<имя-бакета>
+R2_USE_SIGNED_URLS=true
+R2_SIGNED_URL_TTL=3600
+```
 
-- [ ] Клонировать репозиторий
-- [ ] Установить зависимости backend (`pip install -r requirements.txt`)
-- [ ] Установить зависимости frontends (`npm install`)
-- [ ] Создать `.env` с локальными настройками
-- [ ] Применить миграции (`alembic upgrade head`)
-- [ ] Запустить backend локально
-- [ ] Запустить frontends локально
-- [ ] Протестировать работу локально
+**Как получить:**
+1. Зайдите в Cloudflare Dashboard → R2
+2. Создайте bucket (если еще не создан)
+3. Перейдите в "Manage R2 API Tokens"
+4. Создайте API Token с правами Read/Write
+5. Скопируйте Account ID, Access Key ID и Secret Access Key
 
----
+#### Replicate (обязательно):
+```
+GENERATION_PROVIDER=replicate
+REPLICATE_API_TOKEN=<ваш-replicate-token>
+REPLICATE_MODEL=black-forest-labs/flux-1.1-pro
+REPLICATE_TIMEOUT=180
+REPLICATE_POLL_INTERVAL=2
+```
 
-## 🗄️ База данных (5 минут)
+**Как получить:**
+1. Зайдите на https://replicate.com
+2. Войдите в аккаунт
+3. Перейдите в Settings → API tokens
+4. Создайте новый API token
+5. Скопируйте токен
 
-- [ ] Открыть [Render Dashboard](https://dashboard.render.com/)
-- [ ] Создать PostgreSQL базу:
-  - [ ] New → PostgreSQL
-  - [ ] Name: `telepets-db`
-  - [ ] Region: выбрать ближайший
-  - [ ] Plan: Free
-- [ ] Дождаться создания (~2 минуты)
-- [ ] Скопировать **Internal Database URL**
-- [ ] Сохранить URL в безопасное место
+#### База данных и миграции:
+```
+ENVIRONMENT=production
+RUN_MIGRATIONS_ON_STARTUP=true
+SKIP_DB_ON_STARTUP=false
+```
 
----
+**Проверьте существующие:**
+- `DATABASE_URL` - должен быть установлен (Supabase connection string)
+- `TELEGRAM_BOT_TOKEN` - должен быть установлен
+- `SECRET_KEY` - должен быть установлен
 
-## 🔙 Backend на Render (10 минут)
+### 2. Применение миграций БД
 
-- [ ] Подготовить backend репозиторий:
-  - [ ] Создать GitHub репозиторий `telepets-backend`
-  - [ ] Скопировать файлы из `telepets-platform/backend/`
-  - [ ] Закоммитить и запушить
-- [ ] Создать Web Service на Render:
-  - [ ] New → Web Service
-  - [ ] Подключить `telepets-backend` репозиторий
-  - [ ] Name: `telepets-api`
-  - [ ] Build Command: `pip install -r requirements.txt`
-  - [ ] Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- [ ] Настроить Environment Variables:
-  - [ ] `ENVIRONMENT=production`
-  - [ ] `DATABASE_URL=<Internal Database URL>`
-  - [ ] `SECRET_KEY=<сгенерировать>`
-  - [ ] `TELEGRAM_BOT_TOKEN=<ваш токен>`
-  - [ ] `API_BASE_URL=https://telepets-api.onrender.com`
-  - [ ] `RUN_MIGRATIONS_ON_STARTUP=true`
-  - [ ] `SKIP_DB_ON_STARTUP=false`
-  - [ ] `API_HOST=0.0.0.0`
-  - [ ] `API_PORT=$PORT`
-- [ ] Настроить Health Check Path: `/monitoring/health`
-- [ ] Создать сервис
-- [ ] Дождаться деплоя (~5-10 минут)
-- [ ] Проверить: открыть `https://telepets-api.onrender.com/docs`
-- [ ] Протестировать `/monitoring/health` endpoint
+Миграции применятся автоматически при старте сервиса, если `RUN_MIGRATIONS_ON_STARTUP=true`.
 
----
+**Проверка миграций:**
+После деплоя проверьте логи Render, что миграции применились:
+- Ищите сообщения типа "INFO [alembic.runtime.migration] Running upgrade ..."
+- Должны быть применены:
+  - `add_pet_image_urls_20251030` (добавление URL полей)
+  - `drop_pet_image_b64_20251030` (удаление base64 полей)
 
-## 🎨 Frontend WebApp на GitHub Pages (10 минут)
+**Ручное применение (если требуется):**
+Если миграции не применились автоматически, можно применить вручную через Supabase Dashboard:
+1. Зайдите в Supabase Dashboard → SQL Editor
+2. Выполните SQL из миграций (см. файлы в `backend/alembic/versions/`)
 
-- [ ] Подготовить webapp репозиторий:
-  - [ ] Создать GitHub репозиторий `telepets-webapp`
-  - [ ] Скопировать файлы из `telepets-platform/frontends/webapp/`
-  - [ ] Скопировать `.github/workflows/deploy-github-pages.yml`
-  - [ ] Обновить `vite.config.ts` (установить правильный `base`)
-- [ ] Настроить GitHub Actions:
-  - [ ] Открыть Settings → Secrets and variables → Actions
-  - [ ] Добавить `VITE_API_URL=https://telepets-api.onrender.com`
-- [ ] Настроить GitHub Pages:
-  - [ ] Settings → Pages
-  - [ ] Source: Deploy from a branch
-  - [ ] Branch: `gh-pages` (создастся после первого деплоя)
-- [ ] Закоммитить и запушить
-- [ ] Дождаться GitHub Action (~3-5 минут)
-- [ ] Проверить: открыть `https://ваш-username.github.io/telepets-webapp/`
-- [ ] Проверить консоль браузера на ошибки
+### 3. Проверка после деплоя
 
----
+После деплоя проверьте:
 
-## 🎮 Frontend Games на GitHub Pages (10 минут)
+1. **Health endpoint:**
+   ```bash
+   curl https://your-render-service.onrender.com/monitoring/health
+   ```
+   Должен вернуть `200 OK`
 
-- [ ] Повторить те же шаги что для WebApp:
-  - [ ] Создать репозиторий `telepets-games`
-  - [ ] Скопировать файлы из `frontends/games/`
-  - [ ] Настроить GitHub Actions
-  - [ ] Настроить GitHub Pages
-  - [ ] Задеплоить
-- [ ] Проверить: открыть `https://ваш-username.github.io/telepets-games/`
+2. **Логи Render:**
+   - Нет ошибок при старте
+   - Миграции применены успешно
+   - Нет ошибок подключения к R2
+   - Нет ошибок подключения к Replicate
 
----
+3. **Генерация изображения:**
+   - Создайте нового питомца
+   - Проверьте, что изображение генерируется
+   - Проверьте, что изображение загружается в R2
+   - Проверьте, что URL изображения возвращается в API
 
-## 🔄 Обновление CORS (5 минут)
+4. **Игра EggDefense:**
+   - Откройте карточку питомца в состоянии "egg"
+   - Проверьте, что кнопка игры доступна
+   - Проверьте, что игра запускается
 
-- [ ] В `telepets-backend` репозитории:
-  - [ ] Открыть `main.py`
-  - [ ] Добавить GitHub Pages URL в `allow_origins`:
-    ```python
-    allow_origins=[
-        "http://localhost:3001",
-        "https://ваш-username.github.io",  # ← добавить
-        "https://telepets-api.onrender.com",
-    ]
-    ```
-  - [ ] Закоммитить и запушить
-- [ ] Дождаться автодеплоя на Render (~3-5 минут)
+### 4. Деплой Frontend (если требуется)
 
----
+Frontend деплоится отдельно (GitHub Pages или другой хостинг).
 
-## 📱 Telegram WebApp (10 минут)
+**Проверьте:**
+- Конфигурацию API endpoints в `frontends/webapp/src/config/endpoints.ts`
+- URL должен указывать на production API
 
-- [ ] Открыть [@BotFather](https://t.me/BotFather) в Telegram
-- [ ] Настроить Menu Button:
-  - [ ] `/mybots` → выбрать бота
-  - [ ] Bot Settings → Menu Button
-  - [ ] URL: `https://ваш-username.github.io/telepets-webapp/`
-  - [ ] Текст кнопки: `🎮 Играть`
-- [ ] Настроить команды:
-  - [ ] `/setcommands`
-  - [ ] Добавить команды:
-    ```
-    start - Запустить игру
-    help - Помощь
-    profile - Профиль
-    pets - Мои питомцы
-    market - Маркетплейс
-    ```
-- [ ] Настроить описание:
-  - [ ] `/setdescription`
-  - [ ] Добавить описание проекта
-- [ ] Настроить короткое описание:
-  - [ ] `/setabouttext`
-  - [ ] Краткое описание
+## 📝 Важные заметки
 
----
+### Обратная совместимость
+- Старые изображения в base64 останутся в БД, но не будут использоваться
+- Новые изображения будут генерироваться через Replicate и сохраняться в R2
+- При первом запросе изображения оно будет сгенерировано и загружено в R2
 
-## 🤖 Telegram Bot (опционально, 5 минут)
+### Откат изменений
+Если что-то пошло не так:
+1. Можно временно вернуться на HuggingFace, установив `GENERATION_PROVIDER=hf`
+2. Но R2 storage уже требуется для новых изображений
+3. Миграции БД необратимы (base64 поля удалены)
 
-### Вариант A: В том же сервисе что Backend
-- [ ] Уже работает, если бот встроен в `main.py`
-- [ ] Проверить логи Render на наличие "Telegram бот запущен"
+### Мониторинг
+После деплоя следите за:
+- Использованием R2 storage (стоимость)
+- Использованием Replicate API (стоимость)
+- Логами ошибок в Render
+- Производительностью API
 
-### Вариант B: Отдельный Background Worker
-- [ ] New → Background Worker на Render
-- [ ] Name: `telepets-bot`
-- [ ] Start Command: `python bot.py`
-- [ ] Environment Variables: те же что у backend + `API_PUBLIC_URL`
-- [ ] Создать и дождаться деплоя
+## 🆘 Troubleshooting
 
----
+### Ошибка подключения к R2
+- Проверьте правильность R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+- Проверьте правильность R2_ENDPOINT (должен быть `https://<account-id>.r2.cloudflarestorage.com`)
+- Проверьте, что bucket существует
 
-## 🧪 Тестирование (10 минут)
+### Ошибка подключения к Replicate
+- Проверьте правильность REPLICATE_API_TOKEN
+- Проверьте, что токен активен
+- Проверьте, что модель доступна
 
-### Backend
-- [ ] Открыть `https://telepets-api.onrender.com/docs`
-- [ ] Swagger UI загружается
-- [ ] `/monitoring/health` возвращает 200 OK
-- [ ] `/monitoring/metrics` возвращает метрики
-- [ ] Создать тестового питомца через Swagger
+### Ошибки миграций
+- Проверьте подключение к БД (DATABASE_URL)
+- Проверьте логи миграций в Render
+- Если миграции не применились, примените вручную через Supabase Dashboard
 
-### Frontend
-- [ ] Открыть `https://ваш-username.github.io/telepets-webapp/`
-- [ ] Страница загружается
-- [ ] Нет ошибок в консоли (F12)
-- [ ] API запросы проходят (проверить Network tab)
+### Изображения не генерируются
+- Проверьте логи на наличие ошибок Replicate
+- Проверьте, что REPLICATE_API_TOKEN установлен
+- Проверьте квоты Replicate API
 
-### Telegram WebApp - Desktop
-- [ ] Открыть бота в Telegram (Desktop)
-- [ ] `/start` - бот отвечает
-- [ ] Кнопка Menu "🎮 Играть" видна
-- [ ] При клике открывается WebApp
-- [ ] WebApp работает корректно
+## 📞 Поддержка
 
-### Telegram WebApp - Mobile
-- [ ] Открыть бота в Telegram (iOS/Android)
-- [ ] `/start` - бот отвечает
-- [ ] Кнопка Menu "🎮 Играть" видна
-- [ ] При клике открывается WebApp на весь экран
-- [ ] Интерфейс адаптивный
-- [ ] Создание питомца работает
-- [ ] Кормление работает
-- [ ] Игры запускаются
-- [ ] Маркетплейс доступен
-
----
-
-## 📊 Мониторинг (5 минут)
-
-- [ ] Зарегистрироваться на [UptimeRobot](https://uptimerobot.com)
-- [ ] Создать монитор:
-  - [ ] Monitor Type: HTTP(s)
-  - [ ] URL: `https://telepets-api.onrender.com/health`
-  - [ ] Interval: 5 minutes
-  - [ ] Alert: Email/Telegram
-- [ ] Настроить алерты
-- [ ] Проверить что мониторинг работает
-
----
-
-## 🔒 Безопасность (5 минут)
-
-- [ ] Проверить что `.env` не закоммичен в Git
-- [ ] Проверить что `SECRET_KEY` надежный
-- [ ] Проверить что `TELEGRAM_BOT_TOKEN` не утек
-- [ ] Проверить CORS настройки
-- [ ] Проверить что PostgreSQL password надежный
-- [ ] Включить 2FA на GitHub
-- [ ] Включить 2FA на Render
-
----
-
-## 📚 Документация (5 минут)
-
-- [ ] Создать `README.md` в каждом репозитории
-- [ ] Добавить ссылки на production URLs
-- [ ] Задокументировать environment variables
-- [ ] Добавить troubleshooting секцию
-- [ ] Обновить контакты для поддержки
-
----
-
-## 🎉 Финальная проверка
-
-- [ ] ✅ Backend работает: `https://telepets-api.onrender.com`
-- [ ] ✅ WebApp работает: `https://ваш-username.github.io/telepets-webapp/`
-- [ ] ✅ Games работают: `https://ваш-username.github.io/telepets-games/`
-- [ ] ✅ Telegram бот отвечает
-- [ ] ✅ Telegram WebApp открывается и работает
-- [ ] ✅ Можно создать питомца
-- [ ] ✅ Можно кормить питомца
-- [ ] ✅ Игры запускаются
-- [ ] ✅ Маркетплейс доступен
-- [ ] ✅ Мониторинг настроен
-- [ ] ✅ Документация обновлена
-
----
-
-## 🎊 Поздравляем!
-
-Ваш проект **Telepets Platform** успешно опубликован в интернет!
-
-### Что дальше?
-
-1. **Поделиться:** Пригласите друзей протестировать
-2. **Мониторинг:** Следите за метриками и логами
-3. **Улучшения:** Добавляйте новые фичи
-4. **Backup:** Настройте регулярный backup БД
-5. **Масштабирование:** При росте пользователей - переходите на платные тарифы
-
-### Полезные ссылки:
-
-- 📖 [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) - детальный план
-- 🚀 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - полная инструкция
-- ⚡ [QUICK_START.md](QUICK_START.md) - быстрый старт
-- 📊 [Render Dashboard](https://dashboard.render.com)
-- 🐱 [GitHub Actions](https://github.com/your-username/telepets-webapp/actions)
-
----
-
-**Удачи с проектом! 🚀🐾**
+Если возникли проблемы:
+1. Проверьте логи Render Dashboard → Logs
+2. Проверьте документацию в `DEPLOYMENT_PLAN_PROD.md` и `ENV_VARIABLES_PROD.md`
+3. Проверьте переменные окружения в Render Dashboard → Environment
 
