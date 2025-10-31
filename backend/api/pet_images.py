@@ -121,13 +121,10 @@ async def get_pet_image(
     # Сохраняем URL в БД
     if stage_key == "egg":
         pet.image_egg_url = url
-        pet.image_egg_b64 = None
     elif stage_key == "baby":
         pet.image_baby_url = url
-        pet.image_baby_b64 = None
     else:
         pet.image_adult_url = url
-        pet.image_adult_b64 = None
     await db.commit()
 
     return RedirectResponse(url, status_code=307)

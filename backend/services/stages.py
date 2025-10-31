@@ -207,7 +207,6 @@ class StageLifecycleService:
                 pet = result.scalar_one_or_none()
                 if pet:
                     pet.image_egg_url = url
-                    pet.image_egg_b64 = None
                     await db.commit()
             else:
                 # Fallback на альтернативный генератор SVG
@@ -226,7 +225,6 @@ class StageLifecycleService:
                 pet = result.scalar_one_or_none()
                 if pet:
                     pet.image_egg_url = url
-                    pet.image_egg_b64 = None
                     await db.commit()
         except Exception as e:
             logger.error(f"Ошибка генерации изображения для {pet_name}: {e}")
@@ -263,22 +261,20 @@ class StageLifecycleService:
                 url = R2Storage().upload_bytes(key, raw, content_type)
                 if stage_key == 'egg':
                     pet.image_egg_url = url
-                    pet.image_egg_b64 = None
                 elif stage_key == 'baby':
                     pet.image_baby_url = url
-                    pet.image_baby_b64 = None
                 elif stage_key == 'adult':
                     pet.image_adult_url = url
-                    pet.image_adult_b64 = None
             except Exception:
                 pass
         await db.commit()
 
     @staticmethod
     async def wipe_images_on_death(db: AsyncSession, pet: Pet) -> None:
-        pet.image_egg_b64 = None
-        pet.image_baby_b64 = None
-        pet.image_adult_b64 = None
+        # Очищаем URL изображений при смерти питомца (изображения остаются в R2, но ссылки удаляются)
+        pet.image_egg_url = None
+        pet.image_baby_url = None
+        pet.image_adult_url = None
         await db.commit()
 
     # ===== Helpers =====
