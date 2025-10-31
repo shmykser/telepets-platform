@@ -43,9 +43,11 @@ env/
 logs/
 
 # ===== CACHE =====
-cache/
+# Игнорируем только данные кеша, но не Python модули!
+cache/pet_images/
 .cache/
 *.cache
+# НЕ игнорируем cache/*.py файлы!
 
 # ===== NODE / JAVASCRIPT =====
 node_modules/

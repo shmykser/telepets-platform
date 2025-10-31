@@ -37,9 +37,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Проверка наличия важных файлов
-RUN ls -la /app/cache/ || echo "WARNING: cache directory not found"
-RUN ls -la /app/cache/redis_client.py || echo "WARNING: redis_client.py not found"
+# Проверка наличия важных файлов (ПЕРЕД созданием пользователя, чтобы видеть ошибки)
+RUN echo "=== Checking cache directory ===" && \
+    ls -la /app/cache/ 2>&1 || echo "WARNING: cache directory not found" && \
+    echo "=== Checking redis_client.py ===" && \
+    ls -la /app/cache/redis_client.py 2>&1 || echo "WARNING: redis_client.py not found" && \
+    echo "=== Checking __init__.py ===" && \
+    ls -la /app/cache/__init__.py 2>&1 || echo "WARNING: __init__.py not found" && \
+    echo "=== Testing Python import ===" && \
+    python -c "import cache; print('cache module found')" 2>&1 || echo "WARNING: cannot import cache module"
 
 # Non-root user
 RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app

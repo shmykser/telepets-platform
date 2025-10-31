@@ -1,6 +1,12 @@
 # Data and cache artifacts
 /data/
-/cache/
-/cache/**
-!/cache/.gitkeep
+/cache/pet_images/
+/cache/*.json
+/cache/*.svg
+/cache/*.png
+/cache/*.bin
+# НЕ игнорируем Python модули в cache!
+!/cache/__init__.py
+!/cache/redis_client.py
+!/cache/README.md
 
