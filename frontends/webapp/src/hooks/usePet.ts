@@ -3,10 +3,12 @@ import { petApi, economyApi } from '@/lib/api'
 import { getStoredUserId } from '@/utils'
 import { notifySuccess, notifyError } from '@/components/Notification'
 import { useMemo } from 'react'
+import { usePetWebSocket } from './usePetWebSocket'
 
 export function usePet() {
   const queryClient = useQueryClient()
   const userId = useMemo(() => getStoredUserId(), [])
+  const { isConnected: isWebSocketConnected } = usePetWebSocket()
 
   const {
     data: pet,
@@ -14,9 +16,12 @@ export function usePet() {
     error,
     refetch,
   } = useQuery(['pet', userId], () => petApi.getSummary(userId), {
-    refetchInterval: 10000, // Refetch every 10 seconds
+    // Отключаем polling если WebSocket подключен
+    refetchInterval: isWebSocketConnected ? false : 10000, // Refetch every 10 seconds только если WS не подключен
+    refetchIntervalInBackground: false,
     retry: 2,
-    staleTime: 5000, // Data is fresh for 5 seconds
+    // При WebSocket данные всегда свежие, увеличиваем staleTime
+    staleTime: isWebSocketConnected ? Infinity : 5000, // Data is fresh for 5 seconds
     cacheTime: 60000, // Cache for 1 minute
   })
 
@@ -172,16 +177,19 @@ export function usePet() {
 
 export function useAllPets() {
   const userId = useMemo(() => getStoredUserId(), [])
+  const { isConnected: isWebSocketConnected } = usePetWebSocket()
 
   const {
     data: petsData,
     isLoading,
     error,
   } = useQuery(['allPets', userId], () => petApi.getAllPets(userId), {
-    refetchInterval: 5000, // чаще, чтобы переход стадии был виден без перезагрузки
-    refetchIntervalInBackground: true,
+    // Отключаем polling если WebSocket подключен - обновления придут мгновенно
+    refetchInterval: isWebSocketConnected ? false : 5000, // Refetch every 5 seconds только если WS не подключен
+    refetchIntervalInBackground: false, // Не опрашиваем в фоне даже без WS
     retry: 2,
-    staleTime: 2000,
+    // При WebSocket данные всегда свежие
+    staleTime: isWebSocketConnected ? Infinity : 2000, // Data is fresh for 2 seconds
     cacheTime: 300000, // Cache for 5 минут
   })
 

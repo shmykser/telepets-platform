@@ -8,7 +8,7 @@
 
 ### 1. Исправлены .gitignore файлы
 
-**Файл:** `telepets-platform/backend/.gitignore`
+**Файл:** `telepets-platform/backend/.gitignore` 
 
 Было:
 ```
