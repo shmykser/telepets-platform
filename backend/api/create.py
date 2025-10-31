@@ -87,6 +87,35 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
             coins_reward=50
         )
         
+        # Инвалидируем кеш после создания нового питомца
+        try:
+            from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache, invalidate_wallet_cache
+            await invalidate_pets_cache(user_id)
+            await invalidate_summary_cache(user_id)
+            await invalidate_wallet_cache(user_id)
+        except Exception as e:
+            logger.warning(f"Ошибка инвалидации кеша после create_pet: {e}")
+        
+        # Отправляем обновление через WebSocket
+        try:
+            from api.websocket import broadcast_pet_update, broadcast_wallet_update
+            # Получаем обновленные данные для broadcast
+            from api.summary import get_all_pets_summary_internal
+            pets_data = await get_all_pets_summary_internal(user_id, db)
+            await broadcast_pet_update(user_id, "pet_created", {
+                "pet_id": new_pet.id,
+                "pet_name": new_pet.name,
+                "state": new_pet.state.value,
+            })
+            await broadcast_pet_update(user_id, "pets_update", pets_data)
+            await broadcast_wallet_update(user_id, {
+                "coins": wallet.coins,
+                "total_earned": wallet.total_earned,
+                "total_spent": wallet.total_spent
+            })
+        except Exception as e:
+            logger.warning(f"Ошибка отправки WebSocket обновления: {e}")
+        
         # URL эндпоинта получения изображения (абсолютный URL для корректной загрузки с фронтенда)
         from config.settings import API_BASE_URL
         base_url = API_BASE_URL if request is not None else ""

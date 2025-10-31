@@ -31,6 +31,15 @@ RUN_MIGRATIONS_ON_STARTUP=true  # Автоматическое применен�
 SKIP_DB_ON_STARTUP=false
 ```
 
+### Redis (Кеширование и оптимизация)
+```
+REDIS_URL=redis://red-xxxxx:6379  # URL из Render Redis addon или внешний Redis
+REDIS_ENABLED=true  # Включить/выключить кеширование
+CACHE_TTL_PETS=30  # TTL кеша питомцев (секунды)
+CACHE_TTL_WALLET=60  # TTL кеша кошелька (секунды)
+CACHE_TTL_SUMMARY=30  # TTL кеша summary (секунды)
+```
+
 ### Существующие переменные (не изменять)
 ```
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
@@ -64,6 +73,10 @@ PORT=10000  # Порт для Render (устанавливается автом�
 - `API_BASE_URL` - Базовый URL API (для формирования ссылок)
 - `RUN_MIGRATIONS_ON_STARTUP` - true/false (по умолчанию false)
 - `SKIP_DB_ON_STARTUP` - true/false (по умолчанию false)
+- `REDIS_ENABLED` - true/false (по умолчанию true)
+- `CACHE_TTL_PETS` - TTL кеша питомцев в секундах (по умолчанию 30)
+- `CACHE_TTL_WALLET` - TTL кеша кошелька в секундах (по умолчанию 60)
+- `CACHE_TTL_SUMMARY` - TTL кеша summary в секундах (по умолчанию 30)
 
 ## Инструкция по настройке
 
@@ -82,7 +95,15 @@ PORT=10000  # Порт для Render (устанавливается автом�
 4. Создайте новый API token
 5. Скопируйте токен
 
-### 3. Настройка в Render
+### 3. Redis (для кеширования и оптимизации)
+1. В Render Dashboard создайте новый Redis instance (Add New → Redis)
+2. После создания скопируйте Internal Redis URL (формат: `redis://red-xxxxx:6379`)
+3. Добавьте `REDIS_URL` в Environment Variables вашего backend сервиса
+4. Установите `REDIS_ENABLED=true` для включения кеширования
+
+**Важно:** Redis опционален. Если Redis не настроен, приложение будет работать без кеширования.
+
+### 4. Настройка в Render
 1. Зайдите в Render Dashboard
 2. Выберите ваш backend сервис
 3. Перейдите в Environment
@@ -99,6 +120,7 @@ PORT=10000  # Порт для Render (устанавливается автом�
 # 2. Что миграции применились успешно (если RUN_MIGRATIONS_ON_STARTUP=true)
 # 3. Что нет ошибок подключения к R2
 # 4. Что нет ошибок подключения к Replicate
+# 5. Что Redis подключен (если REDIS_ENABLED=true): "Redis подключен: redis://..."
 ```
 
 ## Миграции БД

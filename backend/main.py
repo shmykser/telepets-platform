@@ -8,6 +8,7 @@ from api import monitoring, debug, pet_images
 from api import auth_api
 from api import market
 from api import user_profile, games
+from api import websocket
 from tasks import start_health_decrease_task, start_auction_finalize_task
 from monitoring import start_monitoring_task, MonitoringMiddleware
 from config.settings import (
@@ -83,6 +84,13 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Выключение Telepets API")
+    
+    # Закрываем соединение с Redis
+    try:
+        from cache.redis_client import close_redis
+        await close_redis()
+    except Exception as e:
+        logger.warning(f"Ошибка закрытия Redis при shutdown: {e}")
 
 app = FastAPI(
     title="Telepets API",
@@ -167,6 +175,7 @@ app.include_router(auth_api.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
 app.include_router(user_profile.router, prefix="/api")
 app.include_router(games.router, prefix="/api/games", tags=["games"])
+app.include_router(websocket.router, prefix="/api")
 
 # Служебные роутеры (без /api префикса)
 app.include_router(monitoring.router)

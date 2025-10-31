@@ -16,3 +16,5 @@ asyncpg>=0.29.0
 replicate>=0.25.0
 httpx>=0.24.0
 boto3>=1.34.0
+redis==5.0.1
+aioredis==2.0.1

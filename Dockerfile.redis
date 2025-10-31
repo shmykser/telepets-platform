@@ -1,0 +1,12 @@
+# Dockerfile для Redis на Render
+FROM redis:7-alpine
+
+# Redis будет запущен с дефолтными настройками
+# Порт 6379 уже экспонирован в базовом образе
+
+# Healthcheck для проверки работоспособности Redis
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD redis-cli ping || exit 1
+
+# Redis запускается на порту 6379 по умолчанию
+EXPOSE 6379

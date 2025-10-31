@@ -147,6 +147,31 @@ async def decrease_health_task():
                                 )
                                 db.add(notification)
                                 
+                                # Инвалидируем кеш после перехода стадии
+                                try:
+                                    from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache
+                                    await invalidate_pets_cache(pet.user_id)
+                                    await invalidate_summary_cache(pet.user_id)
+                                except Exception as cache_error:
+                                    logger.warning(f"Ошибка инвалидации кеша после перехода стадии: {cache_error}")
+                                
+                                # Отправляем обновление через WebSocket
+                                try:
+                                    from api.websocket import broadcast_pet_update
+                                    from api.summary import get_all_pets_summary_internal
+                                    # Получаем обновленные данные
+                                    pets_data = await get_all_pets_summary_internal(pet.user_id, db)
+                                    await broadcast_pet_update(pet.user_id, "stage_changed", {
+                                        "pet_id": pet.id,
+                                        "pet_name": pet.name,
+                                        "old_stage": old_stage,
+                                        "new_stage": new_stage,
+                                        "message": transition_message,
+                                    })
+                                    await broadcast_pet_update(pet.user_id, "pets_update", pets_data)
+                                except Exception as ws_error:
+                                    logger.warning(f"Ошибка отправки WebSocket обновления при переходе стадии: {ws_error}")
+                                
                                 # Отправляем уведомление в Telegram
                                 await telegram_client.send_stage_transition_notification(
                                     user_id=pet.user_id,

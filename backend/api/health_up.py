@@ -53,6 +53,27 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
     await db.commit()
     await db.refresh(pet)
     
+    # Инвалидируем кеш после изменения
+    try:
+        from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache
+        await invalidate_pets_cache(user_id)
+        await invalidate_summary_cache(user_id)
+    except Exception as e:
+        logger.warning(f"Ошибка инвалидации кеша после health_up: {e}")
+    
+    # Отправляем обновление через WebSocket
+    try:
+        from api.websocket import broadcast_pet_update
+        await broadcast_pet_update(user_id, "health_changed", {
+            "pet_id": pet.id,
+            "pet_name": pet.name,
+            "health": pet.health,
+            "health_increased": pet.health - old_health,
+            "stage": pet.state.value,
+        })
+    except Exception as e:
+        logger.warning(f"Ошибка отправки WebSocket обновления: {e}")
+    
     return {
         "message": stage_message,
         "health": pet.health,

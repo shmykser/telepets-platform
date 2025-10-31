@@ -453,3 +453,39 @@ MIN_DISPLAY_NAME_LENGTH = 2
 MAX_DISPLAY_NAME_LENGTH = 20
 DEFAULT_ANONYMOUS_MODE = False
 ANONYMOUS_NAME_PLACEHOLDER = "Анонимный игрок"
+
+# ===== НАСТРОЙКИ REDIS (КЕШИРОВАНИЕ) =====
+
+# URL подключения к Redis
+# Для локальной разработки: redis://localhost:6379
+# Для Docker: redis://redis:6379
+# Для продакшн (Render/Supabase): из переменной окружения или внешний Redis
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+# Включение/выключение Redis кеширования
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true").strip().lower() in {"1", "true", "yes", "y"}
+
+# TTL для кеширования данных (в секундах)
+CACHE_TTL_PETS = int(os.getenv("CACHE_TTL_PETS", "30"))  # 30 секунд для данных питомцев
+CACHE_TTL_WALLET = int(os.getenv("CACHE_TTL_WALLET", "60"))  # 60 секунд для кошелька
+CACHE_TTL_SUMMARY = int(os.getenv("CACHE_TTL_SUMMARY", "30"))  # 30 секунд для summary
+
+# Префикс для ключей кеша
+CACHE_KEY_PREFIX = os.getenv("CACHE_KEY_PREFIX", "telepets")
+
+# Настройки WebSocket (для этапа 2)
+WEBSOCKET_ENABLED = os.getenv("WEBSOCKET_ENABLED", "true").strip().lower() in {"1", "true", "yes", "y"}
+WEBSOCKET_PING_INTERVAL = int(os.getenv("WEBSOCKET_PING_INTERVAL", "30"))  # Ping каждые 30 секунд
+
+def get_redis_config() -> dict:
+    """Возвращает конфигурацию Redis"""
+    return {
+        "url": REDIS_URL,
+        "enabled": REDIS_ENABLED,
+        "ttl": {
+            "pets": CACHE_TTL_PETS,
+            "wallet": CACHE_TTL_WALLET,
+            "summary": CACHE_TTL_SUMMARY,
+        },
+        "key_prefix": CACHE_KEY_PREFIX,
+    }
