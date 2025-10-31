@@ -121,6 +121,12 @@ class MonitoringMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Пропускаем OPTIONS запросы (CORS preflight) без логирования метрик
+        # чтобы они обрабатывались CORS middleware без задержек
+        if scope.get("method") == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+
         start_time = time.time()
         try:
             await self.app(scope, receive, send)

@@ -102,6 +102,7 @@ app = FastAPI(
 )
 
 # Добавляем CORS middleware
+# ВАЖНО: CORS middleware должен быть первым, чтобы обрабатывать OPTIONS запросы
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -109,10 +110,23 @@ app.add_middleware(
         "http://127.0.0.1:3001",
         "https://telepets-frontend.onrender.com",
         "https://shmykser.github.io",  # GitHub Pages
+        "https://shmykser.github.io/",  # GitHub Pages с trailing slash
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
+    expose_headers=["*"],
+    max_age=3600,  # Кеш preflight запросов на 1 час
 )
 
 @app.exception_handler(Exception)
@@ -183,7 +197,8 @@ app.include_router(debug.router)
 # Pet images роутер должен быть доступен по /api/pet-images для консистентности с другими API
 app.include_router(pet_images.router, prefix="/api")
 
-# Добавляем мониторинг middleware после всех определений
+# Добавляем мониторинг middleware ПОСЛЕ всех определений роутеров
+# ВАЖНО: MonitoringMiddleware должен быть последним, чтобы не мешать CORS
 app = MonitoringMiddleware(app)
 
 if __name__ == "__main__":
