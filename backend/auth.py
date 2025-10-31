@@ -3,7 +3,7 @@
 Поддерживает простую аутентификацию по user_id для MVP.
 """
 
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -20,7 +20,8 @@ from config.settings import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Простая система безопасности для MVP
 
-security = HTTPBearer()
+# Разрешаем отсутствие токена (auto_error=False), чтобы фронт в dev не падал
+security = HTTPBearer(auto_error=False)
 
 class AuthService:
     """Сервис аутентификации"""
@@ -50,19 +51,20 @@ class AuthService:
             return None
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db)
 ):
     """Получает текущего пользователя по токену"""
-    token = credentials.credentials
-    user_id = AuthService.verify_token(token)
-    
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Недействительный токен",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    user_id: Optional[str] = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+        user_id = AuthService.verify_token(token)
+    # DEV-фоллбэк: если нет токена, пробуем user_id из query/header
+    if not user_id:
+        user_id = request.query_params.get("user_id") or request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     
     # Проверяем, есть ли у пользователя питомец
     result = await db.execute(

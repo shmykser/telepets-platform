@@ -125,11 +125,22 @@ async def get_summary(user_id: str, request: Request, db: AsyncSession = Depends
         current_index = STAGE_ORDER.index(active_pet.state.value)
         next_stage = STAGE_ORDER[current_index + 1] if current_index < len(STAGE_ORDER) - 1 else active_pet.state.value
         
-        # URL изображения (абсолютный URL на домен API через nginx)
-        from config.settings import API_BASE_URL
-        base_url = API_BASE_URL
-        image_path = f"/pet-images/{active_pet.user_id}/{active_pet.name}"
-        image_url = f"{base_url}{image_path}"
+        # URL изображения - используем R2 напрямую, если есть, иначе fallback на proxy URL
+        state_key = active_pet.state.value
+        if state_key == 'egg':
+            direct_url = getattr(active_pet, 'image_egg_url', None)
+        elif state_key == 'baby':
+            direct_url = getattr(active_pet, 'image_baby_url', None)
+        else:
+            direct_url = getattr(active_pet, 'image_adult_url', None)
+        
+        if direct_url:
+            image_url = direct_url
+        else:
+            from config.settings import API_BASE_URL
+            base_url = API_BASE_URL
+            image_path = f"/pet-images/{active_pet.user_id}/{active_pet.name}"
+            image_url = f"{base_url}{image_path}"
         
         # Подготовка расширенных данных
         creature = None
@@ -171,7 +182,20 @@ async def get_summary(user_id: str, request: Request, db: AsyncSession = Depends
         }
     except Exception as e:
         logger.error(f"Ошибка получения питомца: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения питомца")
+        # Возвращаем безопасный ответ вместо 500
+        return {
+            "status": "no_pets",
+            "message": "У вас пока нет питомцев. Создайте первого!",
+            "user_id": user_id,
+            "total_pets": 0,
+            "alive_pets": 0,
+            "dead_pets": 0,
+            "wallet": {
+                "coins": INITIAL_COINS,
+                "total_earned": INITIAL_COINS,
+                "total_spent": 0
+            }
+        }
 
 @router.get("/all")
 async def get_all_pets_summary(user_id: str, request: Request, db: AsyncSession = Depends(get_db)):
@@ -250,7 +274,22 @@ async def get_all_pets_summary(user_id: str, request: Request, db: AsyncSession 
             except Exception:
                 time_to_next_stage = 0
 
-            image_path = f"/pet-images/{pet.user_id}/{pet.name}"
+            # Используем R2 URL напрямую, если есть, иначе fallback на proxy URL
+            state_key = pet.state.value
+            if state_key == 'egg':
+                direct_url = getattr(pet, 'image_egg_url', None)
+            elif state_key == 'baby':
+                direct_url = getattr(pet, 'image_baby_url', None)
+            else:
+                direct_url = getattr(pet, 'image_adult_url', None)
+            
+            # Если есть прямой R2 URL - используем его, иначе proxy URL
+            if direct_url:
+                image_url = direct_url
+            else:
+                image_path = f"/pet-images/{pet.user_id}/{pet.name}"
+                image_url = f"{base_url}{image_path}"
+            
             pets_data.append({
                 "id": pet.id,
                 "name": pet.name,
@@ -262,7 +301,7 @@ async def get_all_pets_summary(user_id: str, request: Request, db: AsyncSession 
                 "updated_at": pet.updated_at.isoformat() + "Z" if pet.updated_at else pet.created_at.isoformat() + "Z",
                 "creature": creature,
                 "prompts": prompts,
-                "image_url": f"{base_url}{image_path}",
+                "image_url": image_url,
             })
         
         # Проверяем, есть ли живые питомцы
@@ -297,4 +336,18 @@ async def get_all_pets_summary(user_id: str, request: Request, db: AsyncSession 
         }
     except Exception as e:
         logger.error(f"Ошибка получения сводки питомцев: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения сводки питомцев") 
+        # Возвращаем безопасный ответ вместо 500
+        return {
+            "status": "no_pets",
+            "message": "У вас пока нет питомцев. Создайте первого!",
+            "user_id": user_id,
+            "pets": [],
+            "total_pets": 0,
+            "alive_pets": 0,
+            "dead_pets": 0,
+            "wallet": {
+                "coins": INITIAL_COINS,
+                "total_earned": INITIAL_COINS,
+                "total_spent": 0
+            }
+        }

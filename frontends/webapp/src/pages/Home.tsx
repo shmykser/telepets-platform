@@ -103,7 +103,11 @@ export default function Home() {
 
   // UserId управление перенесено в Настройки
 
-  if (isLoading) {
+  // Проверяем, есть ли данные в allPets или pet, чтобы не показывать loading без необходимости
+  const hasAnyData = (Array.isArray(allPets) && allPets.length > 0) || pet
+
+  // Показываем loading только если оба хука загружаются И нет данных ни в одном
+  if (isLoading && allLoading && !hasAnyData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -183,7 +187,6 @@ export default function Home() {
   // Флаг: все питомцы мертвы — продолжаем показывать основной интерфейс, но добавим баннер
   const allDead = pet?.status === 'all_dead'
   const hasAlive = Array.isArray(allPets) && allPets.some((p: any) => (p.status || p.life_status) !== 'dead')
-
 
   return (
     <div className="space-y-6">

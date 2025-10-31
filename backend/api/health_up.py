@@ -8,7 +8,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/health_up", tags=["Pet"])
+from api.schemas.common import HealthUpResponse, ErrorResponse
+
+router = APIRouter(prefix="/health_up", tags=["pet"])
 
 async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None = None) -> dict:
     """
@@ -59,7 +61,7 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
         "pet_id": pet.id
     }
 
-@router.post("")
+@router.post("", response_model=HealthUpResponse, responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
 async def health_up(user_id: str, pet_name: str | None = None, db: AsyncSession = Depends(get_db)):
     """
     Увеличивает здоровье питомца в зависимости от его стадии.

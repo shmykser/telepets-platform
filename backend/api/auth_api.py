@@ -2,14 +2,16 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from auth import create_user_token
-from economy import EconomyService
+from services.economy import EconomyService
 import logging
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+from api.schemas.common import TokenResponse, ErrorResponse
+
+router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/token")
+@router.post("/token", response_model=TokenResponse, responses={500: {"model": ErrorResponse}})
 async def issue_token(user_id: str, username: str = None, db: AsyncSession = Depends(get_db)):
     """
     Выдаёт JWT для указанного user_id (MVP). Используется фронтендом автоматически.

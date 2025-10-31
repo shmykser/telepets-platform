@@ -8,16 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from db import get_db
 from models import Pet, PetState, PetLifeStatus, User, Wallet, Transaction
-from economy import EconomyService
+from services.economy import EconomyService
 from config.settings import ACTION_COSTS, PURCHASE_OPTIONS, GAME_REWARD_ALLOWED_GAMES, GAME_REWARD_COINS_PER_SCORE, GAME_REWARD_MAX_PER_REQUEST
 import logging
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/economy", tags=["Economy"])
+from api.schemas.economy import WalletSchema, TransactionsResponse, HealthUpWithCostResponse
 
-@router.get("/wallet/{user_id}")
+router = APIRouter(prefix="/economy", tags=["economy"])
+
+@router.get("/wallet/{user_id}", response_model=WalletSchema)
 async def get_wallet(user_id: str, db: AsyncSession = Depends(get_db)):
     """
     Получает информацию о кошельке пользователя.
@@ -32,8 +34,8 @@ async def get_wallet(user_id: str, db: AsyncSession = Depends(get_db)):
             "coins": wallet.coins,
             "total_earned": wallet.total_earned,
             "total_spent": wallet.total_spent,
-            "created_at": wallet.created_at,
-            "updated_at": wallet.updated_at
+            "created_at": wallet.created_at.isoformat() if getattr(wallet, 'created_at', None) else None,
+            "updated_at": wallet.updated_at.isoformat() if getattr(wallet, 'updated_at', None) else None,
         }
     except Exception as e:
         logger.error(f"Ошибка получения кошелька: {e}")
@@ -54,7 +56,7 @@ async def get_balance(user_id: str, db: AsyncSession = Depends(get_db)):
         logger.error(f"Ошибка получения баланса: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения баланса")
 
-@router.get("/transactions/{user_id}")
+@router.get("/transactions/{user_id}", response_model=TransactionsResponse)
 async def get_transactions(
     user_id: str, 
     limit: int = 20,
@@ -199,7 +201,7 @@ async def claim_game_reward(
         logger.error(f"Ошибка начисления награды за игру: {e}")
         raise HTTPException(status_code=500, detail="Ошибка начисления награды")
 
-@router.post("/actions/{user_id}/health_up")
+@router.post("/actions/{user_id}/health_up", response_model=HealthUpWithCostResponse)
 async def health_up_with_cost(
     user_id: str,
     pet_name: str | None = None,

@@ -4,17 +4,19 @@ from sqlalchemy.future import select
 from db import get_db
 from models import Pet, PetState, PetLifeStatus
 from config.settings import HEALTH_MAX, ACTION_COSTS
-from economy import EconomyService
+from services.economy import EconomyService
 import logging
-from prompt_store import generate_and_store_prompts
+from services.prompt_store import generate_and_store_prompts
 from services.stages import StageLifecycleService
 from .validators import CreatePetRequest
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/create", tags=["Pet"])
+from api.schemas.pet import CreatePetResponse
 
-@router.post("")
+router = APIRouter(prefix="/create", tags=["pet"])
+
+@router.post("", response_model=CreatePetResponse)
 async def create_pet(user_id: str, name: str, override: bool = False, request: Request = None, db: AsyncSession = Depends(get_db)):
     """
     Создает нового питомца для пользователя.

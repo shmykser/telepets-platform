@@ -24,8 +24,8 @@ from config.settings import (
     MARKET_FEE_PERCENT,
     AUCTION_MAX_ACTIVE_PER_USER,
 )
-from economy import EconomyService
-from telegram_client import telegram_client
+from services.economy import EconomyService
+from services.telegram_client import telegram_client
 from services.user_profile import UserProfileService
 
 import logging

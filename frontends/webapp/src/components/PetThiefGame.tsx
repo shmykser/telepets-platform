@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pet } from '@/types'
 import { useGameFullscreen } from '@/hooks/games/useGameFullscreen'
+import { buildUrl, ENV_INFO } from '@/config/endpoints'
 
 interface PetThiefGameProps {
   pet: Pet
@@ -127,9 +128,12 @@ export default function PetThiefGame({ pet, onGameEnd, onClose }: PetThiefGamePr
         const iframe = document.createElement('iframe')
         iframeRef.current = iframe
         
-        // Временное решение: используем прямую ссылку на игру
-        // TODO: Интегрировать игры в основное приложение
-        const gameUrl = `https://shmykser.github.io/telepets-platform/games/index.html?pet_name=${encodeURIComponent(pet.name || '')}&user_id=${encodeURIComponent(pet.user_id || '')}&game_type=pet_thief`
+        // Используем централизованный конфиг для URL игры
+        const gameUrl = buildUrl.game({
+          pet_name: pet.name || '',
+          user_id: pet.user_id || '',
+          game_type: 'pet_thief',
+        })
         
         console.log('🎮 [PetThiefGame] Loading game from:', gameUrl)
         iframe.src = gameUrl
@@ -144,7 +148,7 @@ export default function PetThiefGame({ pet, onGameEnd, onClose }: PetThiefGamePr
         const handleMessage = (event: MessageEvent) => {
           // В dev режиме разрешаем сообщения с любых localhost портов
           // В prod проверяем что это наш origin
-          if (isDev) {
+          if (ENV_INFO.isDev) {
             // Dev: разрешаем любые localhost
             if (!event.origin.startsWith('http://localhost:')) {
               console.warn('🚫 [PetThiefGame] Message from non-localhost origin:', event.origin)

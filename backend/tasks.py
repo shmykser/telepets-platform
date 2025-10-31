@@ -16,8 +16,8 @@ from config.settings import (
     TASK_SLEEP_INTERVAL,
     ACHIEVEMENT_CHECK_INTERVALS,
 )
-from telegram_client import telegram_client
-from economy import EconomyService
+from services.telegram_client import telegram_client
+from services.economy import EconomyService
 import asyncio
 import logging
 from datetime import datetime, timedelta

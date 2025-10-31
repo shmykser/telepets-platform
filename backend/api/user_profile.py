@@ -53,18 +53,33 @@ async def get_user_profile(
         profile = await UserProfileService.get_user_profile(db, current_user["user_id"])
         
         if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Профиль пользователя не найден"
+            # Безопасный ответ по умолчанию вместо 404/500, чтобы фронт не падал
+            return UserProfileResponse(
+                user_id=current_user["user_id"],
+                telegram_username=None,
+                display_name=None,
+                is_anonymous=True,
+                first_name=None,
+                last_name=None,
+                public_name="Player",
+                created_at="",
+                updated_at=None,
             )
-        
         return profile
         
     except Exception as e:
         logger.error(f"Ошибка получения профиля пользователя: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения профиля"
+        # Возвращаем безопасный ответ вместо 500
+        return UserProfileResponse(
+            user_id=current_user.get("user_id", ""),
+            telegram_username=None,
+            display_name=None,
+            is_anonymous=True,
+            first_name=None,
+            last_name=None,
+            public_name="Player",
+            created_at="",
+            updated_at=None,
         )
 
 

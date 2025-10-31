@@ -47,7 +47,7 @@ setLogger({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.DEV ? '' : '/telepets-platform'}>
         <App />
         <Notification />
       </BrowserRouter>

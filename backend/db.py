@@ -41,6 +41,32 @@ AsyncSessionLocal = sessionmaker(
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Для SQLite добавим недостающие колонки image_*_url (быстрая стартовая миграция)
+        if async_database_url.startswith("sqlite+"):
+            try:
+                def _ensure_cols(sync_conn):
+                    cols = sync_conn.exec_driver_sql("PRAGMA table_info(pets)").fetchall()
+                    names = {c[1] for c in cols}
+                    ddl = []
+                    if 'image_egg_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_egg_url VARCHAR")
+                    if 'image_baby_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_baby_url VARCHAR")
+                    if 'image_adult_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_adult_url VARCHAR")
+                    # Удаляем legacy base64-колонки, если существуют (SQLite не умеет DROP COLUMN до 3.35 — пробуем, иначе игнор)
+                    drop_candidates = ['image_egg_b64','image_baby_b64','image_adult_b64']
+                    for col in drop_candidates:
+                        if col in names:
+                            try:
+                                sync_conn.exec_driver_sql(f"ALTER TABLE pets DROP COLUMN {col}")
+                            except Exception:
+                                pass
+                    for stmt in ddl:
+                        sync_conn.exec_driver_sql(stmt)
+                await conn.run_sync(_ensure_cols)
+            except Exception:
+                pass
 
 async def get_db():
     async with AsyncSessionLocal() as session:

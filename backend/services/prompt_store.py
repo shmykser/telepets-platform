@@ -34,10 +34,11 @@ def generate_and_store_prompts(user_id: str, pet_name: str) -> Dict[str, Any]:
     """
     # Подключаем генератор
     try:
-        from backend.generator.promt_gen import CreatureGenerator
+        # прямой импорт из пакета проекта
+        from generator.promt_gen import CreatureGenerator
     except Exception:
-        # fallback на относительный импорт
-        from .generator.promt_gen import CreatureGenerator  # type: ignore
+        # fallback на абсолютный путь, если запуск не из backend
+        from backend.generator.promt_gen import CreatureGenerator  # type: ignore
 
     generator = CreatureGenerator()
     creature = generator.generate_creature()
