@@ -151,7 +151,9 @@ export function usePetWebSocket() {
               break
 
             case 'wallet_updated':
-              // Обновление кошелька
+              // Обновление кошелька - используем setQueryData вместо invalidateQueries,
+              // чтобы не вызывать лишний HTTP запрос при активном WebSocket
+              queryClient.setQueryData(['wallet', userId], message.data)
               queryClient.setQueryData(['allPets', userId], (oldData: any) => {
                 if (!oldData) return oldData
                 return {
@@ -166,7 +168,30 @@ export function usePetWebSocket() {
                   wallet: message.data,
                 }
               })
-              queryClient.invalidateQueries(['wallet', userId])
+              break
+
+            case 'auctions_updated':
+              // Обновление аукционов - используем setQueryData для обновления всех активных query ключей
+              // Поддерживаем различные комбинации status, page, pageSize
+              if (message.data && message.data.items) {
+                // Обновляем все возможные комбинации query keys для аукционов
+                queryClient.setQueriesData(['auctions'], (oldData: any) => {
+                  if (!oldData) return oldData
+                  // Если данные соответствуют структуре ответа API
+                  if (oldData.items && Array.isArray(oldData.items)) {
+                    return {
+                      ...oldData,
+                      items: message.data.items,
+                      page: message.data.page || oldData.page,
+                      page_size: message.data.page_size || oldData.page_size,
+                    }
+                  }
+                  return oldData
+                })
+              } else {
+                // Если данных нет, инвалидируем все запросы аукционов
+                queryClient.invalidateQueries(['auctions'])
+              }
               break
 
             case 'error':

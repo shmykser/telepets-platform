@@ -4,18 +4,23 @@ import { getStoredUserId } from '@/utils'
 import { notifySuccess, notifyError } from '@/lib/notifications'
 import { useMemo } from 'react'
 import type { Auction } from '@/types'
+import { usePetWebSocket } from './usePetWebSocket' // Для интеграции с WebSocket
 
 export function useWallet() {
   const userId = useMemo(() => getStoredUserId(), [])
+  const { isConnected: isWebSocketConnected } = usePetWebSocket()
 
   const {
     data: wallet,
     isLoading,
     error,
   } = useQuery(['wallet', userId], () => economyApi.getWallet(userId), {
-    refetchInterval: 10000, // чаще, чтобы видеть награды за стадии быстрее
+    // Отключаем polling если WebSocket подключен - обновления придут мгновенно через wallet_updated
+    refetchInterval: isWebSocketConnected ? false : 10000, // Refetch every 10 seconds только если WS не подключен
+    refetchIntervalInBackground: false,
     retry: 2,
-    staleTime: 5000, // данные считаются свежими 5 секунд
+    // При WebSocket данные всегда свежие
+    staleTime: isWebSocketConnected ? Infinity : 5000, // Data is fresh for 5 seconds или бесконечно при WS
     cacheTime: 300000, // Cache for 5 минут
   })
 
@@ -159,9 +164,13 @@ export function useCoinBalance(explicitCoins?: number) {
 // ====== РЫНОК / АУКЦИОНЫ ======
 
 export function useAuctions(status: string = 'active', page: number = 1, pageSize: number = 20) {
+  const { isConnected: isWebSocketConnected } = usePetWebSocket() // Проверяем подключение WebSocket
+
   const { data, isLoading, error, refetch } = useQuery(['auctions', status, page, pageSize], () => marketApi.listAuctions({ status, page, page_size: pageSize }), {
-    refetchInterval: 30000, // Обновляем раз в 30 секунд вместо 5 (слишком часто)
-    staleTime: 15000, // Данные считаются свежими 15 секунд
+    // Отключаем polling если WebSocket подключен - обновления придут через WebSocket
+    refetchInterval: isWebSocketConnected ? false : 30000, // Обновляем раз в 30 секунд только если WS не подключен
+    staleTime: isWebSocketConnected ? Infinity : 15000, // При WebSocket данные всегда свежие
+    cacheTime: 300000, // Cache for 5 минут
   })
   return { auctions: (data?.items || []) as Auction[], page: data?.page || page, pageSize: data?.page_size || pageSize, isLoading, error, refetch }
 }

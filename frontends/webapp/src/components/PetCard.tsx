@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { cn, getHealthColor, getHealthText, getStageInfo, formatTime, getActionCost } from '@/utils'
 import type { Pet } from '@/types'
 import { useTimer } from '@/hooks/useTimer'
+import { usePetWebSocket } from '@/hooks/usePetWebSocket' // Для интеграции с WebSocket
 
 interface PetCardProps {
   pet: Pet
@@ -42,12 +43,18 @@ export default function PetCard({
   const [showGame, setShowGame] = useState(false)
   const [showEggGame, setShowEggGame] = useState(false)
   const navigate = useNavigate()
+  const { isConnected: isWebSocketConnected } = usePetWebSocket() // Проверяем подключение WebSocket
   // Ищем активный аукцион для этого питомца
   // Используем общий query key для всех питомцев, чтобы не делать множественные запросы
   const { data: activeAuctionsData } = useQuery(
     ['auctions', 'active', 1, 200],
     () => marketApi.listAuctions({ status: 'active', page: 1, page_size: 200 }),
-    { refetchInterval: 30000, staleTime: 15000 } // Обновляем раз в 30 секунд вместо 5
+    { 
+      // Отключаем polling если WebSocket подключен - обновления придут через WebSocket
+      refetchInterval: isWebSocketConnected ? false : 30000, // Обновляем раз в 30 секунд только если WS не подключен
+      staleTime: isWebSocketConnected ? Infinity : 15000, // При WebSocket данные всегда свежие
+      cacheTime: 300000, // Cache for 5 минут
+    }
   )
   const activeAuction = useMemo(() => {
     const items = (activeAuctionsData?.items || []) as any[]
