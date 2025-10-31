@@ -80,6 +80,44 @@ export class EggDefense extends Phaser.Scene {
                 this.obstacleInteractionSystem.initialize();
             }
         });
+        
+        // Отправляем сообщение о готовности игры родительскому окну (для интеграции с WebApp)
+        this.time.delayedCall(100, () => {
+            this.sendMessageToParent('GAME_READY', {
+                message: 'Egg Defender готова к запуску'
+            });
+        });
+        
+        // Если игра запущена напрямую через iframe (с параметром game_type), автоматически запускаем игру
+        // Это необходимо для интеграции с WebApp - когда игра запускается из карточки питомца
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameType = urlParams.get('game_type');
+        
+        if (gameType === 'egg_defense') {
+            console.log('🚀 [EggDefense] Обнаружен параметр game_type=egg_defense, автоматически запускаем игру');
+            // Даем время на полную инициализацию всех систем перед запуском игры
+            // dragDropSystem инициализируется через 2000ms, поэтому используем большую задержку
+            this.time.delayedCall(2500, () => {
+                console.log('🚀 [EggDefense] Все системы инициализированы, запускаем игру');
+                this.startGameFromMenu();
+            });
+        }
+    }
+    
+    /**
+     * Получает данные питомца из URL параметров (для совместимости с WebApp)
+     */
+    getPetDataFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const petName = urlParams.get('pet_name');
+        const userId = urlParams.get('user_id');
+        const gameType = urlParams.get('game_type');
+        
+        return {
+            petName: petName || 'Unknown Pet',
+            userId: userId || 'unknown_user',
+            gameType: gameType || 'egg_defense'
+        };
     }
 
     /**
@@ -498,12 +536,24 @@ export class EggDefense extends Phaser.Scene {
     gameOver(won = false) {
         this.isGameEnded = true;
         
+        const stats = this.getGameStats();
         
         // Отправляем событие окончания игры
         this.eventSystem.emit(EVENT_TYPES.GAME_END, {
             scene: this,
             won: won,
-            stats: this.getGameStats()
+            stats: stats
+        });
+        
+        // Отправляем результаты родительскому окну (для интеграции с WebApp)
+        // Используем количество убитых врагов как score
+        const score = stats.enemiesKilled || 0;
+        this.sendMessageToParent('GAME_END', {
+            won: won,
+            score: score,
+            enemiesKilled: stats.enemiesKilled,
+            gameTime: stats.gameTimeText,
+            stats: stats
         });
         
         // Останавливаем все системы
@@ -521,6 +571,22 @@ export class EggDefense extends Phaser.Scene {
         // this.time.delayedCall(GAME_SETTINGS.endGameDelay, () => {
         //     this.scene.start('MenuScene');
         // });
+    }
+    
+    /**
+     * Отправка сообщения родительскому окну (для интеграции с WebApp)
+     */
+    sendMessageToParent(type, payload = {}) {
+        if (window.parent && window.parent !== window) {
+            // Используем '*' для dev режима или document.referrer для prod
+            // В dev режиме порты могут быть разные (3001 vs 5174 или 3002)
+            const targetOrigin = '*'; // Для dev режима
+            window.parent.postMessage({
+                type,
+                payload
+            }, targetOrigin);
+            console.log(`📤 [EggDefense] Отправлено сообщение родителю: ${type}`, payload);
+        }
     }
     
     /**

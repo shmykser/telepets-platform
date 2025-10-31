@@ -162,10 +162,13 @@ export class PreloadScene extends Phaser.Scene {
         
         console.log('🎮 [PreloadScene] Load complete, game_type:', gameType);
         
-        // Если указан game_type=pet_thief, запускаем PetThiefScene напрямую
+        // Если указан конкретный тип игры — запускаем напрямую соответствующую сцену
         if (gameType === 'pet_thief') {
             console.log('🚀 [PreloadScene] Starting PetThiefScene directly');
             this.scene.start('PetThiefScene');
+        } else if (gameType === 'egg_defense') {
+            console.log('🚀 [PreloadScene] Starting EggDefense directly');
+            this.scene.start('EggDefense');
         } else {
             // Иначе переходим к главному меню
             console.log('📋 [PreloadScene] Starting MenuScene');

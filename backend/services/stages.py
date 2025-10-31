@@ -13,8 +13,10 @@ from config.settings import (
     get_stage_negative_prompt,
     get_realism_prompt,
 )
-from prompt_store import generate_and_store_prompts, load_prompts
-from generator.image_gen import HFImageGenerator
+from services.prompt_store import generate_and_store_prompts, load_prompts
+from services.generation.factory import get_image_generator
+from services.r2_storage import R2Storage
+from config.settings import build_pet_image_key
 from generator.promt_gen import CreatureGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -33,6 +35,13 @@ class StageLifecycleService:
     @staticmethod
     def _generate_png_for_stage(user_id: str, pet_name: str, stage_key: str) -> Tuple[Optional[str], Dict[str, Any]]:
         """Пытается сгенерировать PNG через HF по сохранённому промпту. Возвращает (path, metadata)."""
+        # Диагностический лог пайплайна
+        try:
+            os.makedirs('./logs', exist_ok=True)
+            with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
+                _f.write(f"start _generate_png_for_stage user={user_id} pet={pet_name} stage={stage_key}\n")
+        except Exception:
+            pass
         stored = StageLifecycleService.ensure_prompts(user_id, pet_name)
         stage_prompts = (stored.get("stage_prompts", {}) or {})
         prompt_en = (stage_prompts.get(stage_key, {}) or {}).get("en")
@@ -45,13 +54,13 @@ class StageLifecycleService:
                 prompt_en = None
 
         if not prompt_en:
-            # Fallback: сгенерировать рандомного зверя (для совместимости)
-            cg = CreatureGenerator()
-            gen = HFImageGenerator()
-            result = gen.generate_creature_image(cg, output_dir=get_file_settings()["output_dir"], stage=stage_key)
-            if result and result.get("success"):
-                return result["image_path"], result.get("metadata", {})
-            return None, {}
+            # Минимальный безопасный промпт, чтобы не падать в SVG
+            base_by_stage = {
+                "egg": "a single egg with subtle textures, photorealistic, studio lighting",
+                "baby": "a cute baby animal portrait, photorealistic, studio lighting",
+                "adult": "a realistic adult animal portrait, photorealistic, studio lighting",
+            }
+            prompt_en = base_by_stage.get(stage_key, base_by_stage["baby"])  # fallback
 
         gen_defaults = get_generation_defaults()
         preferred_model = gen_defaults["preferred_model"]
@@ -60,16 +69,42 @@ class StageLifecycleService:
         realism_prompt = get_realism_prompt(gen_defaults["realism_style"])  # type: ignore
         enhanced_prompt = f"{prompt_en}, {realism_prompt}, masterpiece, best quality, highly detailed, ultra detailed, 8k resolution, professional photography, natural lighting, realistic creature, detailed anatomy, natural environment, realistic proportions, detailed features, natural colors, realistic shadows, depth of field, natural pose"
 
-        gen = HFImageGenerator()
+        gen = get_image_generator()
+        try:
+            from config.settings import get_generation_provider
+            prov = get_generation_provider()
+            os.makedirs('./logs', exist_ok=True)
+            with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
+                _f.write(f"generator={type(gen).__name__} provider={prov} prompt_len={len(enhanced_prompt)}\n")
+        except Exception:
+            pass
         img = gen.generate_image(
             enhanced_prompt,
-            model=preferred_model,
             negative_prompt=stage_negative,
             **quality_settings,
         )
 
         if img is None:
-            return None, {}
+            # Вторая попытка: короткий безопасный промпт без negative
+            safe_by_stage = {
+                "egg": "a single egg, photorealistic, studio lighting",
+                "baby": "a cute baby animal portrait, photorealistic, studio lighting",
+                "adult": "a realistic adult animal portrait, photorealistic, studio lighting",
+            }
+            safe_prompt = safe_by_stage.get(stage_key, safe_by_stage["baby"])
+            try:
+                with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
+                    _f.write("first gen None, retry with safe prompt\n")
+            except Exception:
+                pass
+            img = gen.generate_image(safe_prompt, **quality_settings)
+            if img is None:
+                try:
+                    with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
+                        _f.write("retry also None -> fallback SVG\n")
+                except Exception:
+                    pass
+                return None, {}
 
         import time as _time
         ts = int(_time.time())
@@ -78,6 +113,11 @@ class StageLifecycleService:
         os.makedirs(out_dir, exist_ok=True)
         image_path = os.path.join(out_dir, f"{safe_name}.png")
         img.save(image_path)
+        try:
+            with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
+                _f.write(f"saved_png={image_path}\n")
+        except Exception:
+            pass
 
         metadata = {
             "user_id": user_id,
@@ -138,16 +178,63 @@ class StageLifecycleService:
                 pet.prompt_adult_en = adult_en
             await db.commit()
 
-        # Сразу генерируем изображение для первой стадии (egg) и сохраняем в БД как base64
-        image_path, metadata = StageLifecycleService.get_or_generate_image(user_id, pet_name, "egg", health=100)
+        # Сразу генерируем изображение для первой стадии (egg) и загружаем в R2 (в БД только URL)
         try:
-            await StageLifecycleService.persist_stage_artifacts(db, user_id, pet_name, "egg", (stage_prompts.get("egg", {}) or {}).get("en"), image_path)
-        except Exception:
+            gen_defaults = get_generation_defaults()
+            quality_settings = get_quality_settings(gen_defaults["quality_preset"])  # type: ignore
+            stage_negative = get_stage_negative_prompt("egg", include_global=True)
+            realism_prompt = get_realism_prompt(gen_defaults["realism_style"])  # type: ignore
+            egg_prompt = (stage_prompts.get("egg", {}) or {}).get("en") or "a single egg with subtle textures, photorealistic, studio lighting"
+            enhanced_prompt = f"{egg_prompt}, {realism_prompt}, masterpiece, best quality, highly detailed, ultra detailed, 8k resolution, professional photography, natural lighting, realistic creature, detailed anatomy, natural environment, realistic proportions, detailed features, natural colors, realistic shadows, depth of field, natural pose"
+
+            gen = get_image_generator()
+            img = gen.generate_image(
+                enhanced_prompt,
+                negative_prompt=stage_negative,
+                **quality_settings,
+            )
+            if img is not None:
+                from io import BytesIO
+                from services.r2_storage import R2Storage
+                from config.settings import build_pet_image_key
+                buf = BytesIO()
+                img.save(buf, format="PNG")
+                raw = buf.getvalue()
+                key = build_pet_image_key(user_id, pet_name, "egg", ext="png")
+                url = R2Storage().upload_bytes(key, raw, "image/png")
+                # сохранить URL в БД
+                result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
+                pet = result.scalar_one_or_none()
+                if pet:
+                    pet.image_egg_url = url
+                    pet.image_egg_b64 = None
+                    await db.commit()
+            else:
+                # Fallback на альтернативный генератор SVG
+                from io import BytesIO
+                from services.r2_storage import R2Storage
+                from config.settings import build_pet_image_key
+                from pet_generator_alternative import pet_generator_alternative
+                svg_path, metadata = await pet_generator_alternative.generate_pet_image(user_id, pet_name, "egg", HEALTH_MAX)
+                # Читаем SVG файл и загружаем в R2
+                with open(svg_path, 'rb') as f:
+                    svg_data = f.read()
+                key = build_pet_image_key(user_id, pet_name, "egg", ext="svg")
+                url = R2Storage().upload_bytes(key, svg_data, "image/svg+xml")
+                # сохранить URL в БД
+                result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
+                pet = result.scalar_one_or_none()
+                if pet:
+                    pet.image_egg_url = url
+                    pet.image_egg_b64 = None
+                    await db.commit()
+        except Exception as e:
+            logger.error(f"Ошибка генерации изображения для {pet_name}: {e}")
             pass
 
     @staticmethod
     async def persist_stage_artifacts(db: AsyncSession, user_id: str, pet_name: str, stage_key: str, prompt_en: Optional[str], image_path: Optional[str]) -> None:
-        """Сохраняет promt_en и image_b64 текущей стадии в таблицу pets."""
+        """Сохраняет promt_en и URL текущей стадии (загрузка в R2) в таблицу pets."""
         result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
         pet = result.scalar_one_or_none()
         if not pet:
@@ -159,18 +246,30 @@ class StageLifecycleService:
             pet.prompt_baby_en = prompt_en
         elif stage_key == 'adult' and prompt_en:
             pet.prompt_adult_en = prompt_en
-        # Картинка в base64
+        # Загрузка в R2 и сохранение URL
         if image_path and os.path.exists(image_path):
             try:
                 with open(image_path, 'rb') as f:
-                    import base64
-                    b64 = base64.b64encode(f.read()).decode('utf-8')
+                    raw = f.read()
+                # Определяем content-type и расширение
+                head = raw[:10]
+                if head.startswith(b"<?xml") or b"<svg" in head:
+                    ext = 'svg'; content_type = 'image/svg+xml'
+                elif head.startswith(b"\x89PNG\r\n\x1a\n"):
+                    ext = 'png'; content_type = 'image/png'
+                else:
+                    ext = 'png'; content_type = 'image/png'
+                key = build_pet_image_key(user_id, pet_name, stage_key, ext=ext)
+                url = R2Storage().upload_bytes(key, raw, content_type)
                 if stage_key == 'egg':
-                    pet.image_egg_b64 = b64
+                    pet.image_egg_url = url
+                    pet.image_egg_b64 = None
                 elif stage_key == 'baby':
-                    pet.image_baby_b64 = b64
+                    pet.image_baby_url = url
+                    pet.image_baby_b64 = None
                 elif stage_key == 'adult':
-                    pet.image_adult_b64 = b64
+                    pet.image_adult_url = url
+                    pet.image_adult_b64 = None
             except Exception:
                 pass
         await db.commit()

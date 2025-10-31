@@ -5,6 +5,7 @@ import HealthBar from '@/components/ui/HealthBar'
 import { useState, useMemo } from 'react'
 import CreateAuctionModal from '@/components/market/CreateAuctionModal'
 import PetThiefGame from './PetThiefGame'
+import EggDefenderGame from './EggDefenderGame'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from 'react-query'
 import { marketApi, gamesApi } from '@/lib/api'
@@ -39,6 +40,7 @@ export default function PetCard({
 }: PetCardProps) {
   const [showMarketModal, setShowMarketModal] = useState(false)
   const [showGame, setShowGame] = useState(false)
+  const [showEggGame, setShowEggGame] = useState(false)
   const navigate = useNavigate()
   // Ищем активный аукцион для этого питомца
   // Используем общий query key для всех питомцев, чтобы не делать множественные запросы
@@ -80,6 +82,25 @@ export default function PetCard({
 
   const handleCloseGame = () => {
     setShowGame(false)
+  }
+
+  // Egg Defender: обработчики
+  const handlePlayEggGame = () => {
+    setShowEggGame(true)
+  }
+
+  const handleEggGameEnd = async (score: number) => {
+    try {
+      // Используем общий эндпоинт начисления награды за игры
+      await economyApi.claimGameReward(pet.user_id, 'egg_defender', score)
+      console.log(`Egg Defender завершена! Очки: ${score}`)
+    } catch (error) {
+      console.error('Ошибка при сохранении прогресса Egg Defender:', error)
+    }
+  }
+
+  const handleCloseEggGame = () => {
+    setShowEggGame(false)
   }
 
   //
@@ -205,7 +226,7 @@ export default function PetCard({
             </div>
           )}
 
-          {/* Play game for alive adult/teen pets */}
+          {/* Play game for alive adult/teen pets (Pet Thief) */}
           {!isDead && (pet.state === 'adult' || pet.state === 'baby') && (
             <div className="flex space-x-2">
               <Button
@@ -215,6 +236,20 @@ export default function PetCard({
                 <Gamepad2 size={20} className="mb-1" />
                 <span className="text-base font-semibold">Играть</span>
                 <span className="text-xs text-slate-300">Pet Thief</span>
+              </Button>
+            </div>
+          )}
+
+          {/* Play game for egg state (Egg Defender) */}
+          {!isDead && pet.state === 'egg' && (
+            <div className="flex space-x-2">
+              <Button
+                onClick={handlePlayEggGame}
+                className="flex-1 flex-col py-3 bg-green-600 hover:bg-green-700"
+              >
+                <Gamepad2 size={20} className="mb-1" />
+                <span className="text-base font-semibold">Играть</span>
+                <span className="text-xs text-slate-300">Egg Defender</span>
               </Button>
             </div>
           )}
@@ -248,6 +283,13 @@ export default function PetCard({
           pet={pet}
           onGameEnd={handleGameEnd}
           onClose={handleCloseGame}
+        />
+      )}
+      {showEggGame && (
+        <EggDefenderGame
+          pet={pet}
+          onGameEnd={handleEggGameEnd}
+          onClose={handleCloseEggGame}
         />
       )}
     </motion.div>

@@ -1,8 +1,9 @@
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Загружаем переменные окружения из .env файла
-load_dotenv()
+# Загружаем переменные окружения из .env файла (ищем от корня проекта)
+# find_dotenv поднимется вверх от текущего файла/рабочей директории и найдёт ближайший .env
+load_dotenv(find_dotenv(), override=False)
 
 # Telegram Bot settings
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -38,7 +39,7 @@ HEALTH_UP_AMOUNTS = {
 }
 
 # Настройки перехода между стадиями (в секундах)
-STAGE_TRANSITION_INTERVAL = 30  # для всех стадий
+STAGE_TRANSITION_INTERVAL = 300  # для всех стадий
 
 # Порядок стадий развития
 STAGE_ORDER = ['egg', 'baby', 'adult']
@@ -248,9 +249,8 @@ USER_ID_MIN_LENGTH = 1
 PET_NAME_MAX_LENGTH = 30
 PET_NAME_MIN_LENGTH = 1
 USER_ID_PATTERN = r'^[0-9a-zA-Z_-]+$'
-# Имя питомца: только английские буквы (по запросу), цифры и пробелы/дефисы/подчеркивания запрещены
-# Если разрешены только буквы (без цифр и символов): используйте r'^[A-Za-z]+$'
-PET_NAME_PATTERN = r'^[A-Za-z]+$'
+# Имя питомца: начинается с буквы, далее буквы/цифры/дефис/подчеркивание
+PET_NAME_PATTERN = r'^[A-Za-z][A-Za-z0-9_-]*$'
 
 # ===== НАСТРОЙКИ HTTP =====
 HTTP_TIMEOUT = 10
@@ -283,7 +283,7 @@ MODELS = {
     }
 }
 
-# Базовые настройки для генерации изображений
+# Базовые настройки для генерации изображений (общие)
 DEFAULT_SETTINGS = {
     "steps": 30,
     "guidance_scale": 8.5,
@@ -359,8 +359,18 @@ API_SETTINGS = {
     "default_model": "black-forest-labs/FLUX.1-dev",
 }
 
+GENERATION_PROVIDER = os.getenv("GENERATION_PROVIDER", "replicate").strip().lower()  # replicate | hf
+
+REPLICATE_SETTINGS = {
+    "model": os.getenv("REPLICATE_MODEL", "black-forest-labs/flux-1.1-pro"), #black-forest-labs/flux-1.1-pro
+    #"model": os.getenv("REPLICATE_MODEL", "qwen/qwen-image"), # qwen/qwen-image (временно заменено с black-forest-labs/flux-1.1-pro)
+    "timeout": int(os.getenv("REPLICATE_TIMEOUT", "180")),
+    "poll_interval": float(os.getenv("REPLICATE_POLL_INTERVAL", "2")),
+}
+
 GENERATION_DEFAULTS = {
-    "preferred_model": "flux1-dev",
+    "provider": GENERATION_PROVIDER,
+    "preferred_model": "flux-1.1-pro" if GENERATION_PROVIDER == "replicate" else "flux1-dev",
     "realism_style": "photorealistic",
     "quality_preset": "high",
 }
@@ -392,6 +402,41 @@ def get_all_realism_styles():
 
 def get_generation_defaults():
     return GENERATION_DEFAULTS.copy()
+
+def get_generation_provider() -> str:
+    return GENERATION_PROVIDER
+
+def get_replicate_settings():
+    return REPLICATE_SETTINGS.copy()
+
+# ===== CLOUDFLARE R2 (S3-compatible) =====
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_ENDPOINT = os.getenv("R2_ENDPOINT")  # e.g. https://<account>.r2.cloudflarestorage.com
+R2_BUCKET = os.getenv("R2_BUCKET")
+R2_PUBLIC_BASE_URL = os.getenv("R2_PUBLIC_BASE_URL")  # CDN/custom domain for public GET
+R2_USE_SIGNED_URLS = os.getenv("R2_USE_SIGNED_URLS", "false").strip().lower() in {"1","true","yes","y"}
+R2_SIGNED_URL_TTL = int(os.getenv("R2_SIGNED_URL_TTL", "3600"))
+
+def get_r2_config() -> dict:
+    return {
+        "account_id": R2_ACCOUNT_ID,
+        "access_key_id": R2_ACCESS_KEY_ID,
+        "secret_access_key": R2_SECRET_ACCESS_KEY,
+        "endpoint": R2_ENDPOINT,
+        "bucket": R2_BUCKET,
+        "public_base_url": R2_PUBLIC_BASE_URL,
+        "use_signed_urls": R2_USE_SIGNED_URLS,
+        "signed_url_ttl": R2_SIGNED_URL_TTL,
+    }
+
+def build_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
+    # Ключ должен включать 'pets/' для совместимости с существующими URL в БД
+    safe_user = user_id
+    safe_pet = pet_name
+    safe_stage = stage_key
+    return f"pets/{safe_user}/{safe_pet}/{safe_stage}.{ext}"
 
 def get_stage_negative_prompt(stage_key: str, include_global: bool = True) -> str:
     base = DEFAULT_SETTINGS.get("negative_prompt", "") if include_global else ""

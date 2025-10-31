@@ -88,7 +88,8 @@ export const buildUrl = {
     if (params.game_type) searchParams.set('game_type', params.game_type)
     
     const queryString = searchParams.toString()
-    return `${baseUrl}${basePath}${queryString ? '?' + queryString : ''}`
+    // Добавляем index.html для правильной загрузки игры
+    return `${baseUrl}${basePath}index.html${queryString ? '?' + queryString : ''}`
   },
   
   /**
