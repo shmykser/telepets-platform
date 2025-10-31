@@ -34,8 +34,12 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 
-# Copy application
+# Copy application code
 COPY . .
+
+# Проверка наличия важных файлов
+RUN ls -la /app/cache/ || echo "WARNING: cache directory not found"
+RUN ls -la /app/cache/redis_client.py || echo "WARNING: redis_client.py not found"
 
 # Non-root user
 RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app

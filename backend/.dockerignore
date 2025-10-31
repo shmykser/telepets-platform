@@ -5,59 +5,54 @@ __pycache__/
 *.so
 .Python
 *.egg-info/
-
-# Virtual environments
-venv/
-env/
-ENV/
+dist/
+build/
 .venv/
-
-# Databases
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
-
-# Environment
-.env
-.env.*
-
-# Logs
-*.log
-
-# Cache
-cache/
-.cache/
+venv/
+ENV/
+env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-.DS_Store
+*.swo
+*~
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Logs
+*.log
+logs/
 
-# Build
-build/
-dist/
+# Database
+*.db
+*.db-journal
+telepets_dev.db
+telepets.db
+
+# Cache - игнорируем только изображения, но не Python модули!
+cache/pet_images/
+cache/*.json
+cache/*.svg
+cache/*.png
+cache/*.bin
+
+# Test files
+test_*
+*_test.py
+
+# Environment
+.env
+.env.local
 
 # Git
 .git/
 .gitignore
 
 # Documentation
-docs/
 *.md
 !README.md
 
-# Alembic (если не нужны миграции в image)
-# alembic/
-
-# Temporary files
-*.tmp
-*.bak
-
+# Data
+data/
+*.json
+!requirements.txt
