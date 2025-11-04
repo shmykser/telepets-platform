@@ -6,12 +6,12 @@ from typing import Optional
 from typing import List
 from datetime import datetime
 
-from db import get_db
+from core.db import get_db
 from services.auction import AuctionService
 from services.user_profile import UserProfileService
 from models import Auction, AuctionStatus
 from config.settings import AUCTION_LIST_PAGE_SIZE, MARKET_ENABLED
-from auth import get_current_user
+from core.auth import get_current_user
 
 router = APIRouter(prefix="/market", tags=["Market"])
 

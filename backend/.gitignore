@@ -10,3 +10,9 @@
 !/cache/redis_client.py
 !/cache/README.md
 
+# Test and temporary files in root
+/*.png
+/*.bin
+/*.db
+replicate_test_*.png
+

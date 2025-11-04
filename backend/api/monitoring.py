@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
-from db import get_db
+from core.db import get_db
 from models import Pet, Notification, PetState, PetLifeStatus
-from monitoring import metrics_collector, get_health_status
+from core.monitoring import metrics_collector, get_health_status
 from config.settings import APP_VERSION
-from auth import get_current_user
+from core.auth import get_current_user
 import logging
 from datetime import datetime, timedelta
 

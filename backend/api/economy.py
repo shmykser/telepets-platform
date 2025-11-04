@@ -6,7 +6,7 @@ API endpoints для экономики Telepets.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from db import get_db
+from core.db import get_db
 from models import Pet, PetState, PetLifeStatus, User, Wallet, Transaction
 from services.economy import EconomyService
 from config.settings import ACTION_COSTS, PURCHASE_OPTIONS, GAME_REWARD_ALLOWED_GAMES, GAME_REWARD_COINS_PER_SCORE, GAME_REWARD_MAX_PER_REQUEST

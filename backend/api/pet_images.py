@@ -6,7 +6,7 @@ from typing import Optional
 from io import BytesIO
 from PIL import Image
 
-from db import get_db
+from core.db import get_db
 from models import Pet
 from services.generation.factory import get_image_generator
 from services.prompt_store import load_prompts, generate_and_store_prompts
@@ -99,7 +99,7 @@ async def get_pet_image(
     if img is None:
         # Fallback на альтернативный генератор SVG
         try:
-            from pet_generator_alternative import pet_generator_alternative
+            from services.generation.alternative_generator import pet_generator_alternative
             import asyncio
             svg_path, metadata = await pet_generator_alternative.generate_pet_image(user_id, pet_name, stage_key, pet.health)
             # Читаем SVG файл

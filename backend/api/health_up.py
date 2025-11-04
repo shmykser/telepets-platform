@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from db import get_db
+from core.db import get_db
 from models import Pet, PetState, PetLifeStatus
 from config.settings import HEALTH_MAX, HEALTH_UP_AMOUNTS, STAGE_MESSAGES, HEALTH_MIN
 import logging

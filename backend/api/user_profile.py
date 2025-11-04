@@ -5,8 +5,8 @@ API для управления профилем пользователя и н�
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
-from db import get_db
-from auth import get_current_user
+from core.db import get_db
+from core.auth import get_current_user
 from services.user_profile import UserProfileService
 from config.settings import ANONYMOUS_MODE_ENABLED
 import logging

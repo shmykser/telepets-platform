@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update
 from sqlalchemy.orm import selectinload
-from db import get_db
+from core.db import get_db
 from models import User, GameProgress
 from pydantic import BaseModel
 from typing import Optional

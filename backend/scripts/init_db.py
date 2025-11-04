@@ -10,7 +10,7 @@ import os
 # Добавляем текущую директорию в путь
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from db import init_db
+from core.db import init_db
 from models import Base
 from sqlalchemy.ext.asyncio import create_async_engine
 

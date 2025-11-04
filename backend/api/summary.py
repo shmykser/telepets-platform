@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from db import get_db
+from core.db import get_db
 from models import Pet, PetState, PetLifeStatus, User, Wallet
 import logging
 from datetime import datetime, timedelta

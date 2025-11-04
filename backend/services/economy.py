@@ -79,7 +79,7 @@ class EconomyService:
             if not _retry:
                 try:
                     # Пытаемся инициализировать БД и повторить
-                    from db import init_db  # локальный импорт, чтобы избежать циклов
+                    from core.db import init_db  # локальный импорт, чтобы избежать циклов
                     await init_db()
                     logger.info("Выполнен init_db() после ошибки — повторяю создание кошелька")
                     return await EconomyService.create_user_wallet(db, user_id, username, _retry=True)

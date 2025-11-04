@@ -11,7 +11,7 @@ import logging
 import asyncio
 from datetime import datetime
 
-from db import get_db
+from core.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ async def websocket_pets(
         try:
             # Получаем начальные данные питомцев
             from api.summary import get_all_pets_summary_internal
-            from db import get_db
+            from core.db import get_db
             # Используем async for для правильного управления сессией
             async for db in get_db():
                 pets_data = await get_all_pets_summary_internal(user_id, db)

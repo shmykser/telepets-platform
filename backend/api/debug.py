@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from db import get_db, engine, init_db
+from core.db import get_db, engine, init_db
 from sqlalchemy import text
 from sqlalchemy.future import select
 from models import Pet, User, Wallet

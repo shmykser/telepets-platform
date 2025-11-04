@@ -21,7 +21,7 @@ from generator.promt_gen import CreatureGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models import Pet, PetState
-from pet_generator_alternative import pet_generator_alternative
+from services.generation.alternative_generator import pet_generator_alternative
 
 
 class StageLifecycleService:
@@ -213,7 +213,7 @@ class StageLifecycleService:
                 from io import BytesIO
                 from services.r2_storage import R2Storage
                 from config.settings import build_pet_image_key
-                from pet_generator_alternative import pet_generator_alternative
+                from services.generation.alternative_generator import pet_generator_alternative
                 svg_path, metadata = await pet_generator_alternative.generate_pet_image(user_id, pet_name, "egg", HEALTH_MAX)
                 # Читаем SVG файл и загружаем в R2
                 with open(svg_path, 'rb') as f:
@@ -281,7 +281,7 @@ class StageLifecycleService:
     @staticmethod
     def _get_prompt_from_db_sync(user_id: str, pet_name: str, stage_key: str) -> Optional[str]:
         """Синхронный helper для получения промпта из БД (используется в sync-пайплайне генерации изображений)."""
-        from db import AsyncSessionLocal
+        from core.db import AsyncSessionLocal
         from models import Pet
         import asyncio as _asyncio
 

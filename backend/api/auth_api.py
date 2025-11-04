@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from db import get_db
-from auth import create_user_token
+from core.db import get_db
+from core.auth import create_user_token
 from services.economy import EconomyService
 import logging
 

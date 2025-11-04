@@ -25,9 +25,11 @@ backend/
   Dockerfile              # Оптимизированный multi-stage образ
   Dockerfile.production   # Продовый образ (если используется отдельно)
   main.py                 # Точка входа FastAPI
-  db.py                   # Движок БД и session factory
-  tasks.py                # Фоновые задачи
-  monitoring.py           # Метрики и health
+  core/                   # Ядро приложения
+    db.py                 # Движок БД и session factory
+    auth.py               # Аутентификация и авторизация
+    tasks.py              # Фоновые задачи
+    monitoring.py         # Метрики и health
 ```
 
 ### Модели (ORM)
@@ -54,6 +56,10 @@ backend/
 - `services/user_profile.py`: профиль, анонимность, публичные имена
 - `services/prompt_store.py`: хранение/загрузка промптов
 - `services/telegram_client.py`: уведомления Telegram
+- `services/generation/`: генерация изображений
+  - `factory.py`: фабрика генераторов
+  - `replicate_client.py`: клиент Replicate
+  - `alternative_generator.py`: SVG fallback генератор
 
 ## Переменные окружения
 Загружаются в `config/settings.py` через `python-dotenv` из `.env`.
