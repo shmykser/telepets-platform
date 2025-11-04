@@ -261,9 +261,11 @@ export default function Dock({
 
   // Очистка таймера при размонтировании
   React.useEffect(() => {
+    const timerRef = autoHideTimerRef;
     return () => {
-      if (autoHideTimerRef.current) {
-        clearTimeout(autoHideTimerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);

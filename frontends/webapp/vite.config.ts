@@ -2,11 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
-    base: mode === 'production' ? '/telepets-platform/' : '/', // Для GitHub Pages в production, без префикса в dev
+    base: mode === 'production' ? '/telepets-platform/' : '/',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -17,25 +16,23 @@ export default defineConfig(({ mode }) => {
       host: true,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:8080',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
+          rewrite: (path) => path.replace(/^\/api/, '/api'),
         },
-        // Проксируем картинки питомцев на бэкенд, иначе запросы уйдут на dev‑сервер Vite
         '/pet-images': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:8080',
           changeOrigin: true,
         },
-        // На случай прямой отдачи из кэша (SVG) по относительным путям
         '/static': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:8080',
           changeOrigin: true,
         },
       },
     },
     build: {
       outDir: 'dist',
-      sourcemap: false, // Отключаем для production
+      sourcemap: false,
       rollupOptions: {
         output: {
           manualChunks: {
@@ -47,3 +44,4 @@ export default defineConfig(({ mode }) => {
     },
   }
 })
+
