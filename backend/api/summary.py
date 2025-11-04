@@ -166,22 +166,12 @@ async def get_summary_internal(user_id: str, db: AsyncSession):
     current_index = STAGE_ORDER.index(active_pet.state.value)
     next_stage = STAGE_ORDER[current_index + 1] if current_index < len(STAGE_ORDER) - 1 else active_pet.state.value
     
-    # URL изображения - используем R2 напрямую, если есть, иначе fallback на proxy URL
-    state_key = active_pet.state.value
-    if state_key == 'egg':
-        direct_url = getattr(active_pet, 'image_egg_url', None)
-    elif state_key == 'baby':
-        direct_url = getattr(active_pet, 'image_baby_url', None)
-    else:
-        direct_url = getattr(active_pet, 'image_adult_url', None)
-    
-    if direct_url:
-        image_url = direct_url
-    else:
-        from config.settings import API_BASE_URL
-        base_url = API_BASE_URL
-        image_path = f"/pet-images/{active_pet.user_id}/{active_pet.name}"
-        image_url = f"{base_url}{image_path}"
+    # Всегда используем proxy URL через backend для CORS поддержки
+    # Backend проксирует R2 изображения с правильными CORS заголовками
+    from config.settings import API_BASE_URL
+    base_url = API_BASE_URL
+    image_path = f"/api/pet-images/{active_pet.user_id}/{active_pet.name}"
+    image_url = f"{base_url}{image_path}"
     
     # Подготовка расширенных данных
     creature = None
@@ -363,21 +353,10 @@ async def get_all_pets_summary_internal(user_id: str, db: AsyncSession):
         except Exception:
             time_to_next_stage = 0
 
-        # Используем R2 URL напрямую, если есть, иначе fallback на proxy URL
-        state_key = pet.state.value
-        if state_key == 'egg':
-            direct_url = getattr(pet, 'image_egg_url', None)
-        elif state_key == 'baby':
-            direct_url = getattr(pet, 'image_baby_url', None)
-        else:
-            direct_url = getattr(pet, 'image_adult_url', None)
-        
-        # Если есть прямой R2 URL - используем его, иначе proxy URL
-        if direct_url:
-            image_url = direct_url
-        else:
-            image_path = f"/pet-images/{pet.user_id}/{pet.name}"
-            image_url = f"{base_url}{image_path}"
+        # Всегда используем proxy URL через backend для CORS поддержки
+        # Backend проксирует R2 изображения с правильными CORS заголовками
+        image_path = f"/api/pet-images/{pet.user_id}/{pet.name}"
+        image_url = f"{base_url}{image_path}"
         
         pets_data.append({
             "id": pet.id,
