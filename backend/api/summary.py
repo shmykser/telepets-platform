@@ -170,7 +170,8 @@ async def get_summary_internal(user_id: str, db: AsyncSession):
     # Backend проксирует R2 изображения с правильными CORS заголовками
     from config.settings import API_BASE_URL
     base_url = API_BASE_URL
-    image_path = f"/api/pet-images/{active_pet.user_id}/{active_pet.name}"
+    # API_BASE_URL уже содержит /api, поэтому используем только /pet-images
+    image_path = f"/pet-images/{active_pet.user_id}/{active_pet.name}"
     image_url = f"{base_url}{image_path}"
     
     # Подготовка расширенных данных
@@ -355,7 +356,8 @@ async def get_all_pets_summary_internal(user_id: str, db: AsyncSession):
 
         # Всегда используем proxy URL через backend для CORS поддержки
         # Backend проксирует R2 изображения с правильными CORS заголовками
-        image_path = f"/api/pet-images/{pet.user_id}/{pet.name}"
+        # API_BASE_URL уже содержит /api, поэтому используем только /pet-images
+        image_path = f"/pet-images/{pet.user_id}/{pet.name}"
         image_url = f"{base_url}{image_path}"
         
         pets_data.append({

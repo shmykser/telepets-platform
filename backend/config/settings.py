@@ -432,11 +432,12 @@ def get_r2_config() -> dict:
     }
 
 def build_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
-    # Ключ должен включать 'pets/' для совместимости с существующими URL в БД
+    # Бакет называется 'pets', поэтому файлы должны быть в корне бакета без префикса 'pets/'
+    # Формат: {user_id}/{pet_name}/{stage}.{ext}
     safe_user = user_id
     safe_pet = pet_name
     safe_stage = stage_key
-    return f"pets/{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    return f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
 
 def get_stage_negative_prompt(stage_key: str, include_global: bool = True) -> str:
     base = DEFAULT_SETTINGS.get("negative_prompt", "") if include_global else ""
