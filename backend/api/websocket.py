@@ -155,6 +155,29 @@ async def websocket_pets(
     Клиент может отправлять:
     - "ping" - для проверки соединения (сервер отвечает "pong")
     """
+    # Проверяем origin для WebSocket подключений
+    origin = websocket.headers.get("origin")
+    allowed_origins = [
+        "https://shmykser.github.io",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "https://telepets-frontend.onrender.com",
+    ]
+    
+    # Проверяем origin через regex для GitHub Pages
+    import re
+    github_pages_pattern = r"https://shmykser\.github\.io.*"
+    
+    if origin and not (
+        origin in allowed_origins or 
+        re.match(github_pages_pattern, origin)
+    ):
+        logger.warning(f"WebSocket: отклонен origin {origin} для user_id={user_id}")
+        await websocket.close(code=1008, reason="Origin not allowed")
+        return
+    
     await manager.connect(websocket, user_id)
     
     try:

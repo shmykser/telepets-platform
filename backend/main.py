@@ -104,17 +104,23 @@ app = FastAPI(
 
 # Добавляем CORS middleware
 # ВАЖНО: CORS middleware должен быть первым, чтобы обрабатывать OPTIONS запросы
+# Проверяем переменные окружения для дополнительных origins
+additional_origins = os.getenv("CORS_ADDITIONAL_ORIGINS", "").split(",") if os.getenv("CORS_ADDITIONAL_ORIGINS") else []
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://localhost:8080",
         "https://telepets-frontend.onrender.com",
         "https://shmykser.github.io",  # GitHub Pages (корневой)
+        *[origin.strip() for origin in additional_origins if origin.strip()],  # Дополнительные из env
     ],
     allow_origin_regex=r"https://shmykser\.github\.io.*",  # Все подпути GitHub Pages
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
     allow_headers=[
         "Accept",
         "Accept-Language",
@@ -131,8 +137,11 @@ app.add_middleware(
         "Sec-Ch-Ua",
         "Sec-Ch-Ua-Mobile",
         "Sec-Ch-Ua-Platform",
+        "If-None-Match",  # Для ETag
+        "Cache-Control",
+        "Pragma",
     ],
-    expose_headers=["*"],
+    expose_headers=["*", "ETag", "Cache-Control", "Content-Type"],  # Явно экспортируем ETag и Cache-Control
     max_age=3600,  # Кеш preflight запросов на 1 час
 )
 
@@ -148,6 +157,15 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": time.time()
         }
     )
+
+@app.options("/{full_path:path}")
+async def options_handler(request: Request):
+    """
+    Явный обработчик OPTIONS запросов для всех путей.
+    Это гарантирует, что preflight запросы всегда получат правильные CORS заголовки.
+    """
+    from fastapi.responses import Response
+    return Response(status_code=200)
 
 @app.get("/")
 async def root():
