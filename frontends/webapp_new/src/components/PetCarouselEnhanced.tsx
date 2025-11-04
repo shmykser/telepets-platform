@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import React from 'react';
 import type { Pet } from '@/types';
@@ -10,6 +10,9 @@ export interface PetCarouselEnhancedProps {
   onHealthUp?: (pet: Pet) => void;
   onHealthUpWithCost?: (pet: Pet) => void;
   onPlay?: (pet: Pet) => void;
+  onResurrect?: (pet: Pet) => void;
+  wallet?: { coins: number };
+  resurrectCost?: number;
   baseWidth?: number;
   cardHeight?: number;
   autoplay?: boolean;
@@ -29,6 +32,9 @@ export default function PetCarouselEnhanced({
   onHealthUp,
   onHealthUpWithCost,
   onPlay,
+  onResurrect,
+  wallet,
+  resurrectCost = 500,
   baseWidth = 380,
   cardHeight = 500,
   autoplay = false,
@@ -46,13 +52,16 @@ export default function PetCarouselEnhanced({
     const updateWidth = () => {
       const viewportWidth = window.innerWidth;
       if (viewportWidth < 640) {
-        // Мобильные устройства: используем ширину экрана минус отступы (px-4 = 16px * 2)
-        // Учитываем также padding контейнера карусели
-        const availableWidth = viewportWidth - 32; // px-4 на главной странице
-        const carouselPadding = 16; // padding карусели
-        setContainerWidth(availableWidth - carouselPadding * 2);
+        // Мобильные устройства: используем переданную baseWidth напрямую
+        // baseWidth уже учитывает отступы главной страницы
+        setContainerWidth(baseWidth);
         setAdaptiveCardHeight(450); // Меньшая высота на мобильных
+      } else if (viewportWidth >= 640 && viewportWidth < 1024) {
+        // Планшеты (iPad и т.д.): используем переданную baseWidth
+        setContainerWidth(baseWidth);
+        setAdaptiveCardHeight(550); // Большая высота на планшетах
       } else {
+        // Десктоп: используем базовую ширину
         setContainerWidth(baseWidth);
         setAdaptiveCardHeight(cardHeight);
       }
@@ -63,8 +72,13 @@ export default function PetCarouselEnhanced({
     return () => window.removeEventListener('resize', updateWidth);
   }, [baseWidth, cardHeight]);
   
-  const containerPadding = containerWidth < 640 ? 16 : 20;
-  const itemWidth = Math.min(containerWidth - containerPadding * 2, window.innerWidth - 64);
+  const viewportWidthForItem = typeof window !== 'undefined' ? window.innerWidth : 0;
+  const isTabletForItem = viewportWidthForItem >= 640 && viewportWidthForItem < 1024;
+  // Уменьшаем padding на мобильных для лучшего центрирования
+  const containerPadding = containerWidth < 640 ? 8 : (isTabletForItem ? 20 : 20);
+  
+  // На всех устройствах используем containerWidth минус padding
+  const itemWidth = containerWidth - containerPadding * 2;
   const trackItemOffset = itemWidth + GAP;
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -96,11 +110,17 @@ export default function PetCarouselEnhanced({
     }
   }, [pauseOnHover]);
 
+  // Расчет для центрирования (используется в dragConstraints и handleDragEnd)
+  // Центрируем активную карточку в видимой области контейнера для всех размеров экрана
+  const visibleContainerWidth = containerWidth - containerPadding * 2;
+  const centerOffsetForCalc = (visibleContainerWidth / 2) - (itemWidth / 2);
+
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo): void => {
     const offset = info.offset.x;
     const velocity = info.velocity.x;
     const currentX = x.get();
-    const targetX = -(currentIndex * trackItemOffset);
+    // Учитываем центрирование при расчете targetX
+    const targetX = -(currentIndex * trackItemOffset) - centerOffsetForCalc;
     const draggedDistance = currentX - targetX;
     
     let targetIndex = currentIndex;
@@ -112,7 +132,9 @@ export default function PetCarouselEnhanced({
         targetIndex = Math.max(currentIndex - 1, 0);
       }
     } else {
-      const nearestIndex = Math.round(-currentX / trackItemOffset);
+      // Учитываем центрирование при расчете nearestIndex
+      const adjustedX = currentX + centerOffsetForCalc;
+      const nearestIndex = Math.round(-adjustedX / trackItemOffset);
       targetIndex = Math.max(0, Math.min(nearestIndex, pets.length - 1));
     }
     
@@ -120,28 +142,19 @@ export default function PetCarouselEnhanced({
   };
 
   const dragConstraints = {
-    left: -trackItemOffset * (pets.length - 1),
-    right: 0
+    left: -trackItemOffset * (pets.length - 1) - centerOffsetForCalc,
+    right: -centerOffsetForCalc
   };
 
   const PetCard = ({ pet, index }: { pet: Pet; index: number }) => {
-    const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
     const isCardHovered = hoveredCardId === pet.id?.toString();
     
     const range = [-(index + 1) * trackItemOffset, -index * trackItemOffset, -(index - 1) * trackItemOffset];
     const outputRange = [75, 0, -75];
     const carouselRotateY = useTransform(x, range, outputRange, { clamp: false });
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const glowX = ((e.clientX - rect.left) / rect.width) * 100;
-      const glowY = ((e.clientY - rect.top) / rect.height) * 100;
-      setGlowPosition({ x: glowX, y: glowY });
-    };
-
     const handleMouseLeave = () => {
       setHoveredCardId(null);
-      setGlowPosition({ x: 50, y: 50 });
     };
 
     const isDead = pet.status === 'dead';
@@ -157,7 +170,20 @@ export default function PetCarouselEnhanced({
       }
     };
 
+    const getHealthStatus = () => {
+      if (isDead || healthPercentage === 0) {
+        return 'Критическое состояние';
+      } else if (healthPercentage > 70) {
+        return 'Отличное здоровье';
+      } else if (healthPercentage > 40) {
+        return 'Среднее здоровье';
+      } else {
+        return 'Критическое состояние';
+      }
+    };
+
     const stageInfo = getStageInfo(pet.state);
+    const healthStatus = getHealthStatus();
 
     return (
       <motion.div
@@ -170,30 +196,12 @@ export default function PetCarouselEnhanced({
           zIndex: isCardHovered ? 50 : 1,
           overflow: 'visible'
         }}
-        onMouseMove={handleMouseMove}
         onMouseEnter={() => setHoveredCardId(pet.id?.toString() ?? null)}
         onMouseLeave={handleMouseLeave}
         onClick={() => onPetSelect?.(pet)}
         whileHover={{ scale: 1.02 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       >
-        {/* Glow эффект снаружи, чтобы не обрезался, но не выходит за границы карусели */}
-        <div
-          className="absolute rounded-3xl opacity-75 blur-xl pointer-events-none"
-          style={{
-            top: '-4px',
-            left: '-4px',
-            right: '-4px',
-            bottom: '-4px',
-            background: `linear-gradient(135deg, #60A5FA 0%, #34D399 25%, #A78BFA 50%, #F472B6 75%, #60A5FA 100%)`,
-            backgroundSize: '200% 200%',
-            animation: 'gradientShift 4s ease infinite',
-            backgroundPosition: `${glowPosition.x}% ${glowPosition.y}%`,
-            opacity: isCardHovered ? 1 : 0.6,
-            transition: 'opacity 0.3s ease',
-            zIndex: -1
-          }}
-        />
 
         <motion.div
           className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl border border-white/10"
@@ -204,22 +212,15 @@ export default function PetCarouselEnhanced({
             overflowX: 'hidden'
           }}
           animate={{
-            boxShadow: isCardHovered 
-              ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(168, 85, 247, 0.3)'
-              : '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
           }}
           transition={{ duration: 0.3 }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
           <div className={`absolute inset-0 bg-gradient-to-br ${stageInfo.color} opacity-20`} />
           
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10 pointer-events-none"
-            animate={{ opacity: isCardHovered ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-          />
 
-          <div className="relative w-full h-[60%] overflow-hidden">
+          <div className="relative w-full h-[65%] overflow-hidden">
             {pet.image_url ? (
               <motion.img
                 src={pet.image_url}
@@ -255,16 +256,32 @@ export default function PetCarouselEnhanced({
               </div>
             </div>
 
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 flex items-center gap-2 sm:gap-3">
               <div className="px-3 py-1.5 rounded-full backdrop-blur-md bg-white/10 border border-white/20">
                 <span className="text-white text-lg">{stageInfo.emoji}</span>
+              </div>
+              <div className="flex flex-col">
+                <h3 
+                  className="text-white text-base sm:text-lg font-bold leading-tight"
+                  style={{
+                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {pet.name}
+                </h3>
+                <p 
+                  className="text-gray-300 text-xs leading-tight"
+                  style={{
+                    textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {stageInfo.name}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-gradient-to-t from-gray-900 via-gray-900/95 to-transparent flex flex-col">
-            <h3 className="text-white text-xl sm:text-2xl font-bold mb-1 sm:mb-2">{pet.name}</h3>
-            <p className="text-gray-300 text-xs sm:text-sm mb-3 sm:mb-4">{stageInfo.name}</p>
+          <div className="absolute top-[65%] left-0 right-0 bottom-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-0.5 sm:pb-1 bg-gradient-to-t from-gray-900 via-gray-900/95 to-transparent flex flex-col justify-start">
 
             <div className="mb-3 sm:mb-4 flex-shrink-0">
               <div className="flex items-center justify-between text-xs text-gray-400 mb-1 sm:mb-2">
@@ -283,9 +300,37 @@ export default function PetCarouselEnhanced({
                   transition={{ duration: 0.5, ease: 'easeOut' }}
                 />
               </div>
+              <p className="text-xs text-gray-400 mt-1">{healthStatus}</p>
             </div>
 
-            {!isDead && (
+            {isDead ? (
+              <motion.button
+                className="w-full px-4 py-3 rounded-lg text-sm sm:text-base font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2"
+                style={{
+                  background: wallet && wallet.coins >= resurrectCost
+                    ? 'linear-gradient(90deg, #ec4899, #f43f5e, #dc2626, #ec4899)'
+                    : 'linear-gradient(90deg, #6b7280, #4b5563, #374151, #6b7280)',
+                  backgroundSize: wallet && wallet.coins >= resurrectCost ? '200% 100%' : '100% 100%',
+                  opacity: wallet && wallet.coins >= resurrectCost ? 1 : 0.6,
+                  cursor: wallet && wallet.coins >= resurrectCost ? 'pointer' : 'not-allowed'
+                }}
+                animate={wallet && wallet.coins >= resurrectCost ? { backgroundPosition: ['0%', '100%', '0%'] } : {}}
+                transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+                whileHover={wallet && wallet.coins >= resurrectCost ? { scale: 1.02 } : {}}
+                whileTap={wallet && wallet.coins >= resurrectCost ? { scale: 0.98 } : {}}
+                disabled={!wallet || wallet.coins < resurrectCost}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (wallet && wallet.coins >= resurrectCost && onResurrect) {
+                    onResurrect(pet);
+                  }
+                }}
+              >
+                <span className="text-lg">✨</span>
+                <span className="relative z-10">Воскресить питомца</span>
+                <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCost} монет</span>
+              </motion.button>
+            ) : (
               <div className="flex gap-2 flex-shrink-0">
                 <motion.button
                   className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
@@ -342,20 +387,6 @@ export default function PetCarouselEnhanced({
             )}
           </div>
 
-          <AnimatePresence>
-            {isCardHovered && (
-              <motion.div
-                className="absolute inset-0 blur-2xl opacity-40 -z-10"
-                style={{
-                  background: `linear-gradient(135deg, rgba(99, 102, 241, 0.5) 0%, rgba(168, 85, 247, 0.5) 100%)`
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.4 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              />
-            )}
-          </AnimatePresence>
         </motion.div>
       </motion.div>
     );
@@ -365,13 +396,16 @@ export default function PetCarouselEnhanced({
     return <div className={`text-center text-gray-400 ${className}`}>Нет питомцев</div>;
   }
 
+  // Используем уже вычисленный centerOffsetForCalc для центрирования
+  const adjustedX = x;
+
   return (
     <div
       ref={containerRef}
       className={`relative w-full max-w-full mx-auto ${className}`}
       style={{
-        maxWidth: containerWidth < 640 ? '100%' : `${baseWidth}px`,
-        padding: `${containerPadding}px`,
+        maxWidth: '100%',
+        padding: `0 ${containerPadding}px`,
         overflow: 'hidden',
         background: 'transparent'
       }}
@@ -388,11 +422,11 @@ export default function PetCarouselEnhanced({
             perspective: 1200,
             perspectiveOrigin: `${currentIndex * trackItemOffset + itemWidth / 2}px 50%`,
             transformStyle: 'preserve-3d',
-            x,
+            x: adjustedX,
             width: 'max-content'
           }}
           onDragEnd={handleDragEnd}
-          animate={{ x: -(currentIndex * trackItemOffset) }}
+          animate={{ x: -(currentIndex * trackItemOffset) - centerOffsetForCalc }}
           transition={{ 
             type: 'spring', 
             stiffness: 400, 

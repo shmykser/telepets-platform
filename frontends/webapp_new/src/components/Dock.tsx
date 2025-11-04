@@ -66,7 +66,7 @@ function DockItem({
   );
   const size = useSpring(targetSize, spring);
 
-  const scale = useTransform(size, [baseItemSize, magnification], [1, 1.2]);
+  const scale = useTransform(size, [baseItemSize, magnification], [1, 1.1]);
 
   return (
     <motion.div
@@ -131,15 +131,15 @@ function DockLabel({ children, className = '', isHovered }: DockLabelProps) {
       {isVisible && (
         <motion.div
           initial={{ opacity: 0, y: 0, scale: 0.8 }}
-          animate={{ opacity: 1, y: -12, scale: 1 }}
+          animate={{ opacity: 1, y: -5, scale: 1 }}
           exit={{ opacity: 0, y: 0, scale: 0.8 }}
           transition={{ 
             type: 'spring',
             stiffness: 300,
             damping: 25
           }}
-          className={`${className} absolute -top-10 left-1/2 w-fit whitespace-pre rounded-lg border border-white/20 bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl px-3 py-1.5 text-xs text-white shadow-2xl`}
-          style={{ x: '-50%' }}
+          className={`${className} absolute -top-7 left-1/2 w-fit whitespace-pre rounded-lg border border-white/20 bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl px-2.5 py-1 text-xs text-white shadow-2xl`}
+          style={{ x: '-50%', zIndex: 10000 }}
           role="tooltip"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg blur-sm -z-10" />
@@ -192,17 +192,26 @@ export default function Dock({
   // Динамические размеры в зависимости от ширины экрана
   const adaptiveBaseItemSize = screenWidth < 360 ? 44 : isMobile ? 48 : baseItemSize;
   const adaptivePanelHeight = screenWidth < 360 ? 60 : isMobile ? 64 : panelHeight;
-  const adaptiveMagnification = screenWidth < 360 ? 56 : isMobile ? 60 : magnification;
+  const adaptiveMagnification = screenWidth < 360 ? 52 : isMobile ? 56 : 64;
   const adaptiveGap = screenWidth < 360 ? '6px' : isMobile ? '8px' : '12px';
   const adaptivePaddingX = screenWidth < 360 ? '8px' : isMobile ? '12px' : '20px';
   
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
 
+  // Высота подсказки + отступ (оптимизировано для компактности)
+  const labelHeight = 24; // высота подсказки с padding
+  const labelOffset = 6; // отступ между кнопкой и подсказкой
+  
   const maxHeight = useMemo(
-    () => Math.max(dockHeight, adaptiveMagnification + adaptiveMagnification / 2 + 4),
-    [adaptiveMagnification, dockHeight]
+    () => Math.max(adaptivePanelHeight, adaptiveMagnification + labelHeight + labelOffset),
+    [adaptiveMagnification, adaptivePanelHeight]
   );
+  
+  // Динамический padding-top для подсказки (плавно увеличивается при наведении)
+  const paddingTop = useTransform(isHovered, [0, 1], [8, labelHeight + labelOffset - 2]);
+  const paddingTopSpring = useSpring(paddingTop, spring);
+  
   const heightRow = useTransform(isHovered, [0, 1], [adaptivePanelHeight, maxHeight]);
   const height = useSpring(heightRow, spring);
 
@@ -224,13 +233,13 @@ export default function Dock({
         right: 'auto',
         transform: 'translateX(-50%)',
         height: height,
-        maxWidth: 'calc(100vw - 16px)',
-        width: 'auto',
+        maxWidth: 'min(70vw, calc(100vw - 16px))',
+        width: 'fit-content',
         minWidth: 'fit-content',
         paddingLeft: adaptivePaddingX,
         paddingRight: adaptivePaddingX,
         paddingBottom: '8px',
-        paddingTop: '8px',
+        paddingTop: paddingTopSpring,
         background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(31, 41, 55, 0.85) 50%, rgba(17, 24, 39, 0.9) 100%)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -238,7 +247,7 @@ export default function Dock({
         borderRadius: '1rem',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         overflowX: 'hidden',
-        overflowY: 'hidden',
+        overflowY: 'visible',
         WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
