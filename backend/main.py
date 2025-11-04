@@ -22,6 +22,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
+import re
 import time
 
 # Настройка логирования
@@ -109,9 +110,9 @@ app.add_middleware(
         "http://localhost:3001",
         "http://127.0.0.1:3001",
         "https://telepets-frontend.onrender.com",
-        "https://shmykser.github.io",  # GitHub Pages
-        "https://shmykser.github.io/",  # GitHub Pages с trailing slash
+        "https://shmykser.github.io",  # GitHub Pages (корневой)
     ],
+    allow_origin_regex=r"https://shmykser\.github\.io.*",  # Все подпути GitHub Pages
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -124,6 +125,12 @@ app.add_middleware(
         "Origin",
         "Access-Control-Request-Method",
         "Access-Control-Request-Headers",
+        "Sec-Fetch-Mode",
+        "Sec-Fetch-Dest",
+        "Sec-Fetch-Site",
+        "Sec-Ch-Ua",
+        "Sec-Ch-Ua-Mobile",
+        "Sec-Ch-Ua-Platform",
     ],
     expose_headers=["*"],
     max_age=3600,  # Кеш preflight запросов на 1 час
