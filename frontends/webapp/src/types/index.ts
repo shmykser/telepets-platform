@@ -52,3 +52,73 @@ export interface CreatePetResponse {
   wallet: Wallet
 }
 
+export interface Transaction {
+  id: number
+  user_id: string
+  type: string
+  amount: number
+  description?: string
+  status: string
+  created_at: string
+  transaction_data?: any
+}
+
+export interface UserStats {
+  user_id: string
+  total_pets: number
+  alive_pets: number
+  dead_pets: number
+  total_coins_earned: number
+  total_coins_spent: number
+  total_transactions: number
+}
+
+export interface ActionCosts {
+  paid_pet: number
+  health_up: number
+  resurrect: number
+}
+
+export interface Auction {
+  id: number
+  pet_id: number
+  seller: string
+  start_price: number
+  current_price: number
+  buy_now_price?: number
+  end_time: string
+  status: string
+  created_at: string
+  pet?: Pet
+  bids?: AuctionBid[]
+}
+
+export interface AuctionBid {
+  id: number
+  auction_id: number
+  bidder: string
+  amount: number
+  created_at: string
+}
+
+export interface UserProfile {
+  user_id: string
+  username?: string
+  display_name?: string
+  is_anonymous: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface UpdateProfileRequest {
+  display_name?: string
+  is_anonymous?: boolean
+}
+
+export interface PublicUserInfo {
+  user_id: string
+  display_name: string
+  total_pets: number
+  created_at: string
+}
+

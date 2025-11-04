@@ -2,19 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { petApi, economyApi } from '@/lib/api'
 import { getStoredUserId } from '@/utils'
 import { useMemo } from 'react'
-
-// Упрощенная версия без WebSocket
-function notifySuccess(message: string) {
-  console.log('Success:', message)
-}
-
-function notifyError(message: string) {
-  console.error('Error:', message)
-}
+import { usePetWebSocket } from './usePetWebSocket'
+import { notifySuccess, notifyError } from '@/components/Notification'
 
 export function usePet() {
   const queryClient = useQueryClient()
   const userId = useMemo(() => getStoredUserId(), [])
+  const { isConnected: isWebSocketConnected } = usePetWebSocket()
 
   const {
     data: pet,
@@ -22,16 +16,19 @@ export function usePet() {
     error,
     refetch,
   } = useQuery({ queryKey: ['pet', userId], queryFn: () => petApi.getSummary(userId),
-    refetchInterval: 10000,
+    // Отключаем polling если WebSocket подключен
+    refetchInterval: isWebSocketConnected ? false : 10000, // Refetch every 10 seconds только если WS не подключен
     refetchIntervalInBackground: false,
     retry: 2,
-    staleTime: 5000,
-    gcTime: 60000,
+    // При WebSocket данные всегда свежие, увеличиваем staleTime
+    staleTime: isWebSocketConnected ? Infinity : 5000, // Data is fresh for 5 seconds
+    gcTime: 60000, // Cache for 1 minute
   })
 
   const createPetMutation = useMutation({
     mutationFn: ({ name, override = false }: { name: string; override?: boolean }) => petApi.createPet(userId, name, override),
     onSuccess: (data) => {
+      // Мгновенно добавляем питомца в список для карусели
       queryClient.setQueryData({ queryKey: ['allPets', userId] }, (oldData: any) => {
         if (!oldData) return oldData
         const createdAt = new Date().toISOString()
@@ -46,6 +43,7 @@ export function usePet() {
           created_at: createdAt,
           updated_at: createdAt,
           wallet: data.wallet,
+          total_pets: oldData.total_pets, // не используется на уровне элемента
         }
         const pets = Array.isArray(oldData.pets) ? [...oldData.pets, newPet] : [newPet]
         return {
@@ -55,6 +53,7 @@ export function usePet() {
           alive_pets: (oldData.alive_pets || 0) + 1,
         }
       })
+      // Актуализируем агрегаты и кошелёк с сервера
       queryClient.invalidateQueries({ queryKey: ['pet', userId] })
       queryClient.invalidateQueries({ queryKey: ['wallet', userId] })
       notifySuccess('Питомец создан!')
@@ -67,6 +66,7 @@ export function usePet() {
   const healthUpMutation = useMutation({
     mutationFn: (petName?: string) => petApi.healthUp(userId, petName),
     onSuccess: (data, variables) => {
+      // Мгновенно обновляем список питомцев (карусель) без ожидания refetch
       queryClient.setQueryData({ queryKey: ['allPets', userId] }, (oldData: any) => {
         if (!oldData?.pets) return oldData
         const updatedPets = oldData.pets.map((p: any) => {
@@ -82,6 +82,7 @@ export function usePet() {
         })
         return { ...oldData, pets: updatedPets }
       })
+      // Агрегированное резюме обновим через refetch
       queryClient.invalidateQueries({ queryKey: ['pet', userId] })
       notifySuccess(data.message)
     },
@@ -95,6 +96,7 @@ export function usePet() {
       try {
         return await petApi.healthUpWithCost(userId, petName)
       } catch (error: any) {
+        // Локально обработаем 400, чтобы не бросать в консоль
         const status = error?.response?.status
         const detail = error?.response?.data?.detail
         if (status === 400 && typeof detail === 'string') {
@@ -104,6 +106,7 @@ export function usePet() {
       }
     },
     onSuccess: (data, variables) => {
+      // Мгновенное обновление карточек
       queryClient.setQueryData({ queryKey: ['allPets', userId] }, (oldData: any) => {
         if (!oldData?.pets) return oldData
         const updatedPets = oldData.pets.map((p: any) => {
@@ -119,11 +122,13 @@ export function usePet() {
         })
         return { ...oldData, pets: updatedPets }
       })
+      // Баланс и агрегаты подтянем отдельными инвалидациями
       queryClient.invalidateQueries({ queryKey: ['pet', userId] })
       queryClient.invalidateQueries({ queryKey: ['wallet', userId] })
       notifySuccess(data.message)
     },
     onError: (error: any) => {
+      // Локальный UX: покажем текст, но без бросания ошибки наружу
       const detail = error?.message || error?.response?.data?.detail
       notifyError(detail || 'Ошибка увеличения здоровья')
     },
@@ -141,6 +146,7 @@ export function usePet() {
       const userIdLocal = userId
       try {
         const data = await economyApi.resurrectPet(userIdLocal, petName)
+        // Обновляем allPets и wallet
         queryClient.setQueryData({ queryKey: ['allPets', userIdLocal] }, (oldData: any) => {
           if (!oldData?.pets) return oldData
           const updatedPets = oldData.pets.map((p: any) => {
@@ -165,17 +171,20 @@ export function usePet() {
 
 export function useAllPets() {
   const userId = useMemo(() => getStoredUserId(), [])
+  const { isConnected: isWebSocketConnected } = usePetWebSocket()
 
   const {
     data: petsData,
     isLoading,
     error,
   } = useQuery({ queryKey: ['allPets', userId], queryFn: () => petApi.getAllPets(userId),
-    refetchInterval: 5000,
-    refetchIntervalInBackground: false,
+    // Отключаем polling если WebSocket подключен - обновления придут мгновенно
+    refetchInterval: isWebSocketConnected ? false : 5000, // Refetch every 5 seconds только если WS не подключен
+    refetchIntervalInBackground: false, // Не опрашиваем в фоне даже без WS
     retry: 2,
-    staleTime: 2000,
-    gcTime: 300000,
+    // При WebSocket данные всегда свежие
+    staleTime: isWebSocketConnected ? Infinity : 2000, // Data is fresh for 2 seconds
+    gcTime: 300000, // Cache for 5 минут
   })
 
   return {

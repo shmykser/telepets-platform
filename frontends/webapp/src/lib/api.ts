@@ -2,9 +2,17 @@ import axios from 'axios'
 import type { 
   Pet, 
   Wallet, 
+  Transaction,
+  UserStats,
+  ActionCosts,
   PetSummary,
   HealthUpResponse,
   CreatePetResponse,
+  Auction,
+  AuctionBid,
+  UserProfile,
+  UpdateProfileRequest,
+  PublicUserInfo,
 } from '@/types'
 import { buildUrl } from '@/config/endpoints'
 import { getStoredUsername } from '@/utils'
@@ -121,6 +129,63 @@ export const economyApi = {
     return response.data
   },
 
+  getBalance: async (user_id: string): Promise<{ user_id: string; coins: number }> => {
+    const response = await api.get<{ user_id: string; coins: number }>(`/economy/balance/${user_id}`)
+    return response.data
+  },
+
+  getTransactions: async (user_id: string, limit: number = 20): Promise<{ user_id: string; transactions: Transaction[]; total: number }> => {
+    const response = await api.get<{ user_id: string; transactions: Transaction[]; total: number }>(`/economy/transactions/${user_id}`, {
+      params: { limit }
+    })
+    return response.data
+  },
+
+  getUserStats: async (user_id: string): Promise<UserStats> => {
+    const response = await api.get<UserStats>(`/economy/stats/${user_id}`)
+    return response.data
+  },
+
+  purchaseCoins: async (user_id: string, package_id: string): Promise<{
+    success: boolean
+    user_id: string
+    coins_added: number
+    price_usd: number
+    package_id: string
+  }> => {
+    const response = await api.post<{
+      success: boolean
+      user_id: string
+      coins_added: number
+      price_usd: number
+      package_id: string
+    }>(`/economy/purchase/${user_id}`, null, {
+      params: { package_id }
+    })
+    return response.data
+  },
+
+  getActionCosts: async (): Promise<ActionCosts> => {
+    const response = await api.get<ActionCosts>('/economy/actions/costs')
+    return response.data
+  },
+
+  claimDailyLogin: async (user_id: string): Promise<{
+    success: boolean
+    reward_amount: number
+    new_balance: number
+    message: string
+  }> => {
+    const response = await api.post<{
+      success: boolean
+      user_id: string
+      reward_amount: number
+      new_balance: number
+      message: string
+    }>(`/economy/rewards/${user_id}/daily_login`)
+    return response.data
+  },
+
   resurrectPet: async (user_id: string, pet_name: string): Promise<{
     success: boolean
     coins_spent: number
@@ -130,6 +195,89 @@ export const economyApi = {
     const response = await api.post(`/economy/actions/${encodeURIComponent(user_id)}/resurrect`, null, {
       params: { pet_name }
     })
+    return response.data
+  },
+
+  claimGameReward: async (user_id: string, game: string, score: number): Promise<{
+    success: boolean
+    coins_added: number
+    new_balance: number
+    message: string
+  }> => {
+    const response = await api.post(`/economy/games/${encodeURIComponent(user_id)}/claim`, null, {
+      params: { game, score }
+    })
+    return response.data
+  },
+}
+
+// Market API
+export const marketApi = {
+  listAuctions: async (params?: { status?: string; page?: number; page_size?: number }): Promise<{ items: Auction[]; page: number; page_size: number }> => {
+    const response = await api.get('/market/auctions', { params })
+    return response.data
+  },
+
+  getAuction: async (auctionId: number): Promise<Auction> => {
+    const response = await api.get(`/market/auctions/${auctionId}`)
+    return response.data
+  },
+
+  createAuction: async (payload: {
+    pet_id: number
+    start_price: number
+    duration_seconds?: number
+    buy_now_price?: number
+    min_increment_abs?: number
+    min_increment_pct?: number
+  }): Promise<{ id: number; end_time: string; status: string }> => {
+    const { user_id, ...params } = (payload as any)
+    const response = await api.post('/market/auctions', null, { params })
+    return response.data
+  },
+
+  placeBid: async (payload: { auction_id: number; amount: number }): Promise<{ auction: Auction; bid: AuctionBid }> => {
+    const response = await api.post(`/market/auctions/${payload.auction_id}/bids`, null, { params: { amount: payload.amount } })
+    return response.data
+  },
+
+  buyNow: async (payload: { auction_id: number }): Promise<{ id: number; status: string }> => {
+    const response = await api.post(`/market/auctions/${payload.auction_id}/buy_now`)
+    return response.data
+  },
+
+  cancel: async (payload: { auction_id: number }): Promise<{ id: number; status: string }> => {
+    const response = await api.post(`/market/auctions/${payload.auction_id}/cancel`)
+    return response.data
+  },
+}
+
+// Auth API (MVP): авто-выдача токена по user_id — используем authClient без интерсепторов
+export const authApi = {
+  issueToken: async (user_id: string, username?: string): Promise<{ access_token: string; token_type: string; user_id: string }> => {
+    const params: any = { user_id }
+    if (username) {
+      params.username = username
+    }
+    const response = await authClient.post(AUTH_TOKEN_PATH, null, { params })
+    return response.data
+  },
+}
+
+// User Profile API
+export const userProfileApi = {
+  getProfile: async (): Promise<UserProfile> => {
+    const response = await api.get<UserProfile>('/users/profile')
+    return response.data
+  },
+
+  updateProfile: async (data: UpdateProfileRequest): Promise<UserProfile> => {
+    const response = await api.put<UserProfile>('/users/profile', data)
+    return response.data
+  },
+
+  getPublicInfo: async (userId: string): Promise<PublicUserInfo> => {
+    const response = await api.get<PublicUserInfo>(`/users/${userId}/public`)
     return response.data
   },
 }
