@@ -67,11 +67,33 @@ async def get_pet_image(
     }
     existing_url = url_map.get(stage_key)
     if existing_url:
-        # Если в БД лежит прямой приватный URL без подписи — пересоздадим подписанный
-        if "r2.cloudflarestorage.com" in existing_url and "?" not in existing_url:
+        # Проверяем и перегенерируем URL если нужно:
+        # 1. URL без подписи (не содержит ?)
+        # 2. URL содержит старый формат /pets/pets/ (двойной префикс)
+        # 3. URL может быть истёкшим (будет перегенерирован при 403)
+        should_regenerate = False
+        if "r2.cloudflarestorage.com" in existing_url:
+            # Проверяем наличие подписи и правильность пути
+            if "?" not in existing_url or "/pets/pets/" in existing_url:
+                should_regenerate = True
+        
+        if should_regenerate:
+            # Перегенерируем URL с правильным ключом
+            # Пробуем оба варианта: с префиксом pets/ и без (для обратной совместимости)
             key = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
-            signed = R2Storage().make_url(key)
-            # Сохраним обратно и отдадим новый редирект
+            key_with_prefix = f"pets/{key}"
+            
+            r2_storage = R2Storage()
+            # Пробуем сначала новый формат (без префикса), затем старый (с префиксом)
+            found_key = None
+            for key_variant in [key, key_with_prefix]:
+                if r2_storage.key_exists(key_variant):
+                    found_key = key_variant
+                    break
+            
+            # Используем найденный ключ или новый формат по умолчанию
+            signed = r2_storage.make_url(found_key if found_key else key)
+            # Сохраняем URL в БД
             if stage_key == "egg":
                 pet.image_egg_url = signed
             elif stage_key == "baby":
@@ -83,7 +105,38 @@ async def get_pet_image(
         
         # Проксируем через backend для CORS, если URL из R2
         if "r2.cloudflarestorage.com" in existing_url:
-            return await _proxy_r2_image(existing_url, stage_key)
+            try:
+                return await _proxy_r2_image(existing_url, stage_key)
+            except HTTPException as e:
+                # Если получили 403/404, возможно URL истёк или файл перемещён
+                # Перегенерируем URL и попробуем снова
+                if e.status_code in (403, 404, 502):
+                    # URL истёк или файл не найден - ищем файл по обоим вариантам пути
+                    key = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
+                    key_with_prefix = f"pets/{key}"
+                    
+                    r2_storage = R2Storage()
+                    found_key = None
+                    # Проверяем оба варианта пути
+                    for key_variant in [key, key_with_prefix]:
+                        if r2_storage.key_exists(key_variant):
+                            found_key = key_variant
+                            break
+                    
+                    if found_key:
+                        # Файл найден - генерируем новый URL и сохраняем
+                        new_url = r2_storage.make_url(found_key)
+                        if stage_key == "egg":
+                            pet.image_egg_url = new_url
+                        elif stage_key == "baby":
+                            pet.image_baby_url = new_url
+                        else:
+                            pet.image_adult_url = new_url
+                        await db.commit()
+                        # Пробуем получить изображение
+                        return await _proxy_r2_image(new_url, stage_key)
+                    # Если файл не найден - продолжаем выполнение для генерации нового изображения
+                    # (код ниже обработает это)
         
         return RedirectResponse(existing_url, status_code=307)
 
@@ -146,7 +199,7 @@ async def _proxy_r2_image(r2_url: str, stage_key: str) -> Response:
     Решает проблему CORS, когда R2 бакет не настроен на CORS.
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(r2_url)
             response.raise_for_status()
             
@@ -165,6 +218,15 @@ async def _proxy_r2_image(r2_url: str, stage_key: str) -> Response:
                     "X-Pet-Source": "r2_proxied",
                 }
             )
+    except httpx.HTTPStatusError as e:
+        # Преобразуем HTTP ошибки в HTTPException с правильным статус кодом
+        status_code = e.response.status_code
+        if status_code == 403:
+            raise HTTPException(status_code=403, detail=f"Доступ запрещен к изображению в R2 (возможно истёк URL или нет прав): {str(e)}")
+        elif status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Изображение не найдено в R2: {str(e)}")
+        else:
+            raise HTTPException(status_code=502, detail=f"Ошибка получения изображения из R2 (HTTP {status_code}): {str(e)}")
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Ошибка получения изображения из R2: {str(e)}")
 

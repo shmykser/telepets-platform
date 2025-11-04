@@ -69,4 +69,16 @@ class R2Storage:
             deleted += len(batch)
         return deleted
 
+    def key_exists(self, key: str) -> bool:
+        """Проверяет существование файла в R2 по ключу"""
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+            return True
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code == "404":
+                return False
+            # Другие ошибки (403, 500 и т.д.) - считаем что файл не найден
+            return False
+
 
