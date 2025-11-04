@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv, find_dotenv
 
 # Загружаем переменные окружения из .env файла (ищем от корня проекта)
@@ -193,6 +194,21 @@ else:
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
 # URL для генерации абсолютных ссылок на изображения
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8080/api")
+
+# ===== НАСТРОЙКИ ПУТЕЙ К ИЗОБРАЖЕНИЯМ =====
+# Префикс для файлов в R2 бакете (пустой = корень бакета, "pets/" = подпапка pets)
+# Можно переопределить через переменную окружения R2_STORAGE_PREFIX
+R2_STORAGE_PREFIX = os.getenv("R2_STORAGE_PREFIX", "").rstrip("/")
+if R2_STORAGE_PREFIX:
+    R2_STORAGE_PREFIX = f"{R2_STORAGE_PREFIX}/"
+
+# Путь к API endpoint для получения изображений питомцев
+# Можно переопределить через переменную окружения API_PET_IMAGES_PATH
+API_PET_IMAGES_PATH = os.getenv("API_PET_IMAGES_PATH", "/pet-images")
+
+# Префикс для обратной совместимости со старыми файлами в R2
+# Используется для поиска файлов, сохраненных со старым форматом пути
+LEGACY_R2_PREFIX = "pets/"
 def _parse_port(default_port: int = 3000) -> int:
     """Безопасно парсит порт из переменных окружения.
 
@@ -432,12 +448,65 @@ def get_r2_config() -> dict:
     }
 
 def build_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
-    # Бакет называется 'pets', поэтому файлы должны быть в корне бакета без префикса 'pets/'
-    # Формат: {user_id}/{pet_name}/{stage}.{ext}
+    """
+    Строит ключ для сохранения изображения питомца в R2.
+    Использует централизованную конфигурацию R2_STORAGE_PREFIX.
+    
+    Формат: {R2_STORAGE_PREFIX}{user_id}/{pet_name}/{stage}.{ext}
+    
+    Args:
+        user_id: ID пользователя
+        pet_name: Имя питомца
+        stage_key: Стадия питомца (egg, baby, adult)
+        ext: Расширение файла (по умолчанию png)
+    
+    Returns:
+        Полный ключ для R2, например: "273065571/BHbh/baby.png" или "pets/273065571/BHbh/baby.png"
+    """
     safe_user = user_id
     safe_pet = pet_name
     safe_stage = stage_key
-    return f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    base_path = f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    return f"{R2_STORAGE_PREFIX}{base_path}"
+
+
+def get_pet_image_api_url(user_id: str, pet_name: str, base_url: Optional[str] = None) -> str:
+    """
+    Строит полный URL для получения изображения питомца через API.
+    Использует централизованную конфигурацию API_PET_IMAGES_PATH.
+    
+    Args:
+        user_id: ID пользователя
+        pet_name: Имя питомца
+        base_url: Базовый URL API (если не указан, используется API_BASE_URL)
+    
+    Returns:
+        Полный URL, например: "http://localhost:8080/api/pet-images/273065571/BHbh"
+    """
+    if base_url is None:
+        base_url = API_BASE_URL
+    return f"{base_url}{API_PET_IMAGES_PATH}/{user_id}/{pet_name}"
+
+
+def get_legacy_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
+    """
+    Строит ключ для старых файлов в R2 (для обратной совместимости).
+    Использует LEGACY_R2_PREFIX.
+    
+    Args:
+        user_id: ID пользователя
+        pet_name: Имя питомца
+        stage_key: Стадия питомца (egg, baby, adult)
+        ext: Расширение файла (по умолчанию png)
+    
+    Returns:
+        Ключ для старых файлов, например: "pets/273065571/BHbh/baby.png"
+    """
+    safe_user = user_id
+    safe_pet = pet_name
+    safe_stage = stage_key
+    base_path = f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    return f"{LEGACY_R2_PREFIX}{base_path}"
 
 def get_stage_negative_prompt(stage_key: str, include_global: bool = True) -> str:
     base = DEFAULT_SETTINGS.get("negative_prompt", "") if include_global else ""

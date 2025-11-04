@@ -117,10 +117,9 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
             logger.warning(f"Ошибка отправки WebSocket обновления: {e}")
         
         # URL эндпоинта получения изображения (абсолютный URL для корректной загрузки с фронтенда)
-        from config.settings import API_BASE_URL
-        base_url = API_BASE_URL if request is not None else ""
-        image_path = f"/pet-images/{user_id}/{name}"
-        image_url = f"{base_url}{image_path}" if base_url else image_path
+        from config.settings import get_pet_image_api_url, API_BASE_URL
+        base_url = API_BASE_URL if request is not None else None
+        image_url = get_pet_image_api_url(user_id, name, base_url)
         
         return {
             "id": new_pet.id,

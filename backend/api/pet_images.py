@@ -18,9 +18,12 @@ from config.settings import (
     get_stage_negative_prompt,
     get_realism_prompt,
     build_pet_image_key,
+    LEGACY_R2_PREFIX,
+    API_PET_IMAGES_PATH,
 )
 
-router = APIRouter(prefix="/pet-images", tags=["Pet Images"])
+# Используем централизованную конфигурацию пути из settings
+router = APIRouter(prefix=API_PET_IMAGES_PATH, tags=["Pet Images"])
 
 
 def _ensure_prompt(user_id: str, pet_name: str, stage_key: str) -> str:
@@ -74,14 +77,17 @@ async def get_pet_image(
         should_regenerate = False
         if "r2.cloudflarestorage.com" in existing_url:
             # Проверяем наличие подписи и правильность пути
-            if "?" not in existing_url or "/pets/pets/" in existing_url:
+            # Двойной префикс (например /pets/pets/) означает устаревший формат
+            double_prefix = f"{LEGACY_R2_PREFIX}{LEGACY_R2_PREFIX}"
+            if "?" not in existing_url or double_prefix in existing_url:
                 should_regenerate = True
         
         if should_regenerate:
             # Перегенерируем URL с правильным ключом
             # Пробуем оба варианта: с префиксом pets/ и без (для обратной совместимости)
+            from config.settings import get_legacy_pet_image_key
             key = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
-            key_with_prefix = f"pets/{key}"
+            key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png")
             
             r2_storage = R2Storage()
             # Пробуем сначала новый формат (без префикса), затем старый (с префиксом)
@@ -112,8 +118,9 @@ async def get_pet_image(
                 # Перегенерируем URL и попробуем снова
                 if e.status_code in (403, 404, 502):
                     # URL истёк или файл не найден - ищем файл по обоим вариантам пути
+                    from config.settings import get_legacy_pet_image_key
                     key = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
-                    key_with_prefix = f"pets/{key}"
+                    key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png")
                     
                     r2_storage = R2Storage()
                     found_key = None
