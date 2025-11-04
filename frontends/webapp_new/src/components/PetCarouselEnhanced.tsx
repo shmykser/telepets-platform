@@ -51,6 +51,9 @@ export default function PetCarouselEnhanced({
   React.useEffect(() => {
     const updateWidth = () => {
       const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const isIPadPro = viewportWidth >= 1024 && viewportWidth < 1280 && viewportHeight > 1000;
+      
       if (viewportWidth < 640) {
         // Мобильные устройства: используем переданную baseWidth напрямую
         // baseWidth уже учитывает отступы главной страницы
@@ -60,6 +63,10 @@ export default function PetCarouselEnhanced({
         // Планшеты (iPad и т.д.): используем переданную baseWidth
         setContainerWidth(baseWidth);
         setAdaptiveCardHeight(550); // Большая высота на планшетах
+      } else if (isIPadPro) {
+        // iPad Pro: используем переданные размеры (они уже рассчитаны с учетом максимальной высоты)
+        setContainerWidth(baseWidth);
+        setAdaptiveCardHeight(cardHeight); // Используем переданную высоту, которая уже рассчитана как максимальная
       } else {
         // Десктоп: используем базовую ширину
         setContainerWidth(baseWidth);

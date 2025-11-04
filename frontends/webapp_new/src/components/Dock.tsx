@@ -36,6 +36,8 @@ type DockItemProps = {
   distance: number;
   baseItemSize: number;
   magnification: number;
+  isMobile?: boolean;
+  onMobileClick?: (centerX: number, itemHoveredRef: React.MutableRefObject<MotionValue<number>>) => void;
 };
 
 function DockItem({
@@ -46,7 +48,9 @@ function DockItem({
   spring,
   distance,
   magnification,
-  baseItemSize
+  baseItemSize,
+  isMobile = false,
+  onMobileClick
 }: DockItemProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isHovered = useMotionValue(0);
@@ -68,6 +72,28 @@ function DockItem({
 
   const scale = useTransform(size, [baseItemSize, magnification], [1, 1.1]);
 
+  const isHoveredRef = React.useRef(isHovered);
+  
+  // Обновляем ref при каждом рендере, чтобы всегда иметь актуальную ссылку
+  React.useEffect(() => {
+    isHoveredRef.current = isHovered;
+  }, [isHovered]);
+
+  const handleMobileClick = () => {
+    if (isMobile && ref.current && onMobileClick) {
+      // Получаем центр элемента для позиционирования
+      const rect = ref.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      
+      // Уведомляем родительский компонент для управления общим состоянием
+      // Передаем ref на локальный isHovered для возможности сброса
+      onMobileClick(centerX, isHoveredRef);
+    }
+
+    // Вызываем оригинальный onClick
+    onClick?.();
+  };
+
   return (
     <motion.div
       ref={ref}
@@ -76,11 +102,27 @@ function DockItem({
         height: size,
         scale
       }}
-      onHoverStart={() => isHovered.set(1)}
-      onHoverEnd={() => isHovered.set(0)}
-      onFocus={() => isHovered.set(1)}
-      onBlur={() => isHovered.set(0)}
-      onClick={onClick}
+      onHoverStart={() => {
+        if (!isMobile) {
+          isHovered.set(1);
+        }
+      }}
+      onHoverEnd={() => {
+        if (!isMobile) {
+          isHovered.set(0);
+        }
+      }}
+      onFocus={() => {
+        if (!isMobile) {
+          isHovered.set(1);
+        }
+      }}
+      onBlur={() => {
+        if (!isMobile) {
+          isHovered.set(0);
+        }
+      }}
+      onClick={handleMobileClick}
       className={`relative inline-flex items-center justify-center rounded-2xl ${className}`}
       tabIndex={0}
       role="button"
@@ -198,6 +240,8 @@ export default function Dock({
   
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
+  const autoHideTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const activeItemHoveredRef = React.useRef<React.MutableRefObject<MotionValue<number>> | null>(null);
 
   // Высота подсказки + отступ (оптимизировано для компактности)
   const labelHeight = 24; // высота подсказки с padding
@@ -215,15 +259,61 @@ export default function Dock({
   const heightRow = useTransform(isHovered, [0, 1], [adaptivePanelHeight, maxHeight]);
   const height = useSpring(heightRow, spring);
 
+  // Очистка таймера при размонтировании
+  React.useEffect(() => {
+    return () => {
+      if (autoHideTimerRef.current) {
+        clearTimeout(autoHideTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleMobileItemClick = (centerX: number, itemHoveredRef: React.MutableRefObject<MotionValue<number>>) => {
+    if (isMobile) {
+      // Очищаем предыдущий таймер, если есть
+      if (autoHideTimerRef.current) {
+        clearTimeout(autoHideTimerRef.current);
+      }
+
+      // Сбрасываем предыдущий активный элемент
+      if (activeItemHoveredRef.current?.current) {
+        activeItemHoveredRef.current.current.set(0);
+      }
+
+      // Сохраняем ссылку на активный элемент
+      activeItemHoveredRef.current = itemHoveredRef;
+
+      // Устанавливаем состояние "наведено"
+      isHovered.set(1);
+      mouseX.set(centerX);
+      itemHoveredRef.current.set(1);
+
+      // Запускаем таймер на 3 секунды для автоматического скрытия
+      autoHideTimerRef.current = setTimeout(() => {
+        isHovered.set(0);
+        mouseX.set(Infinity);
+        if (activeItemHoveredRef.current?.current) {
+          activeItemHoveredRef.current.current.set(0);
+        }
+        activeItemHoveredRef.current = null;
+        autoHideTimerRef.current = null;
+      }, 3000);
+    }
+  };
+
   return (
     <motion.div
       onMouseMove={({ pageX }) => {
-        isHovered.set(1);
-        mouseX.set(pageX);
+        if (!isMobile) {
+          isHovered.set(1);
+          mouseX.set(pageX);
+        }
       }}
       onMouseLeave={() => {
-        isHovered.set(0);
-        mouseX.set(Infinity);
+        if (!isMobile) {
+          isHovered.set(0);
+          mouseX.set(Infinity);
+        }
       }}
       className={`${className} dock-container`}
       style={{
@@ -288,6 +378,8 @@ export default function Dock({
             distance={distance}
             magnification={adaptiveMagnification}
             baseItemSize={adaptiveBaseItemSize}
+            isMobile={isMobile}
+            onMobileClick={handleMobileItemClick}
           >
             <DockIcon>{item.icon}</DockIcon>
             <DockLabel>{item.label}</DockLabel>

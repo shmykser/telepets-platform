@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import Dock from './Dock';
+import ClickSpark from './ClickSpark';
 import { Home, Store, Coins, History, User, Settings } from 'lucide-react';
 import type { DockItemData } from './Dock';
 
@@ -42,6 +43,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen" style={{ position: 'relative' }}>
+      {/* Глобальный эффект вспышек при кликах */}
+      <ClickSpark />
       {children}
       <Dock items={dockItems} />
     </div>

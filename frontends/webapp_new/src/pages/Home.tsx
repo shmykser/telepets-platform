@@ -1,21 +1,30 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
 import PetCarouselEnhanced from '@/components/PetCarouselEnhanced';
+import QuickStatsHome from '@/components/QuickStatsHome';
+import ButtonVariant1 from '@/components/ButtonVariant1';
+import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
+import DialogEnhanced from '@/components/DialogEnhanced';
 import type { Pet } from '@/types';
 import { buildUrl } from '@/config/endpoints';
 import { getStoredUserId } from '@/utils';
+import { Sparkles } from 'lucide-react';
 
 export default function Home() {
-  const { pets, totalPets, isLoading, wallet } = useAllPets();
-  const { healthUp, healthUpWithCost, resurrect } = usePet();
+  const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
+  const { healthUp, healthUpWithCost, resurrect, createPet, isCreating } = usePet();
   const userId = useMemo(() => getStoredUserId(), []);
-  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [petName, setPetName] = useState('');
+
   // Адаптивные размеры для карусели
   const [carouselSizes, setCarouselSizes] = useState({ baseWidth: 380, cardHeight: 500 });
 
   useEffect(() => {
     const updateSizes = () => {
       const width = window.innerWidth;
+      const height = window.innerHeight;
+      const isIPadPro = width >= 1024 && width < 1280 && height > 1000;
       
       if (width < 640) {
         // Мобильные устройства (< 640px)
@@ -29,8 +38,19 @@ export default function Home() {
           baseWidth: width - 48, // минус padding sm:px-6
           cardHeight: 450 
         });
+      } else if (isIPadPro) {
+        // iPad Pro (1024px ширина, высота > 1000px) - используем максимальную высоту
+        const topSectionHeight = 180; // Примерная высота верхней секции (статусы + кнопка)
+        const paddingTop = 16; // paddingTop
+        const paddingBottom = 80; // paddingBottom + dock
+        const gap = 24; // отступы между секциями
+        const maxCardHeight = height - topSectionHeight - paddingTop - paddingBottom - gap;
+        setCarouselSizes({ 
+          baseWidth: Math.min(700, width - 96), // Широкая карточка, но с отступами
+          cardHeight: Math.max(600, maxCardHeight) // Используем максимальную доступную высоту
+        });
       } else if (width >= 1024 && width < 1280) {
-        // Небольшие десктопы (1024px - 1279px)
+        // Небольшие десктопы (1024px - 1279px, но не iPad Pro)
         setCarouselSizes({ 
           baseWidth: 420, 
           cardHeight: 420 
@@ -62,13 +82,13 @@ export default function Home() {
   // Обработчики действий
   const handleHealthUp = (pet: Pet) => {
     if (pet.name) {
-      healthUp(pet.name);
+    healthUp(pet.name);
     }
   };
 
   const handleHealthUpWithCost = (pet: Pet) => {
     if (pet.name) {
-      healthUpWithCost(pet.name);
+    healthUpWithCost(pet.name);
     }
   };
 
@@ -84,6 +104,19 @@ export default function Home() {
     if (pet.name) {
       resurrect(pet.name);
     }
+  };
+
+  const handleCreatePet = (override?: boolean) => {
+    if (petName.trim()) {
+      createPet({ name: petName.trim(), override: override || false });
+      setPetName('');
+      setIsCreateModalOpen(false);
+    }
+  };
+
+  const handleCancelCreate = () => {
+    setPetName('');
+    setIsCreateModalOpen(false);
   };
 
   // Состояние загрузки
@@ -109,7 +142,7 @@ export default function Home() {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] px-4 sm:px-6 overflow-x-hidden"
+      className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] px-4 sm:px-6 overflow-x-hidden flex flex-col"
       style={{ 
         paddingTop: '1rem', 
         paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', 
@@ -117,9 +150,34 @@ export default function Home() {
         maxWidth: '100vw' 
       }}
     >
-      <div className="max-w-7xl mx-auto w-full overflow-x-hidden">
+      <div className="max-w-7xl mx-auto w-full overflow-x-hidden flex flex-col flex-1">
+        {/* Верхняя секция: быстрые статусы и кнопка создания */}
+        <div className="mb-4 md:mb-6 flex flex-row gap-2 sm:gap-3 md:gap-4">
+          {/* Быстрые статусы */}
+          <div className="flex-1 min-w-0 sm:w-1/2 lg:w-[70%]">
+            <QuickStatsHome
+              totalPets={totalPets || 0}
+              alivePets={alivePets || 0}
+              deadPets={deadPets || 0}
+              coins={wallet?.coins || 0}
+              layout="grid-2x2"
+              />
+            </div>
+            
+          {/* Кнопка создания питомца */}
+          <div className="flex-shrink-0 w-[120px] sm:w-1/2 lg:w-[30%] flex items-stretch">
+            <ButtonVariant1
+              onClick={() => setIsCreateModalOpen(true)}
+              className="w-full h-full min-h-[80px] md:min-h-[100px] flex flex-col items-center justify-center gap-2 text-sm md:text-base"
+              icon={<Sparkles className="w-4 h-4 md:w-5 md:h-5" />}
+                >
+              <span className="font-bold">Создание питомца</span>
+            </ButtonVariant1>
+          </div>
+          </div>
+
         {/* Карусель питомцев */}
-        <div className="w-full">
+        <div className="w-full flex-1 flex items-center justify-center min-h-0">
           <PetCarouselEnhanced
             pets={transformedPets}
             onPetSelect={handlePetSelect}
@@ -138,6 +196,25 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Модальное окно создания питомца */}
+      <DialogEnhanced
+        open={isCreateModalOpen}
+        onClose={handleCancelCreate}
+        variant="glass"
+        size="md"
+      >
+        <CreatePetFormEnhanced
+          petName={petName}
+          setPetName={setPetName}
+          onCreate={handleCreatePet}
+          onCancel={handleCancelCreate}
+          isCreating={isCreating}
+          canCreateFree={true}
+          walletCoins={wallet?.coins}
+          paidCost={0}
+        />
+      </DialogEnhanced>
     </div>
   );
 }
