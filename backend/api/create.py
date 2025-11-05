@@ -54,27 +54,45 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
 
         # Если требуется платное создание — списываем монеты
         if is_paid_creation_required:
+            logger.info(f"💰 Платное создание питомца: user_id={user_id}, name={name}, cost={paid_cost}, wallet.coins={wallet.coins}")
             # Проверяем достаточность средств
             if wallet.coins < paid_cost:
                 raise HTTPException(status_code=400, detail=f"Недостаточно монет для создания питомца. Требуется: {paid_cost}, доступно: {wallet.coins}")
-            spent = await EconomyService.spend_coins(
-                db=db,
-                user_id=user_id,
-                amount=paid_cost,
-                description=f"Платное создание нового питомца ({name})",
-                transaction_data={"action": "create_pet", "pet_name": name}
-            )
-            if not spent:
-                raise HTTPException(status_code=500, detail="Не удалось списать монеты за создание питомца")
+            try:
+                spent = await EconomyService.spend_coins(
+                    db=db,
+                    user_id=user_id,
+                    amount=paid_cost,
+                    description=f"Платное создание нового питомца ({name})",
+                    transaction_data={"action": "create_pet", "pet_name": name}
+                )
+                if not spent:
+                    logger.error(f"❌ spend_coins вернул None для user_id={user_id}, name={name}")
+                    raise HTTPException(status_code=500, detail="Не удалось списать монеты за создание питомца")
+                logger.info(f"✅ Монеты списаны успешно: user_id={user_id}, name={name}")
+            except Exception as e:
+                logger.error(f"❌ Ошибка при списании монет: user_id={user_id}, name={name}, error={e}", exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Ошибка при списании монет: {str(e)}")
             
             # Обновляем объект wallet после транзакции
-            await db.refresh(wallet)
+            try:
+                await db.refresh(wallet)
+                logger.info(f"✅ Wallet обновлен: user_id={user_id}, wallet.coins={wallet.coins}")
+            except Exception as e:
+                logger.error(f"❌ Ошибка при обновлении wallet: user_id={user_id}, error={e}", exc_info=True)
+                # Не падаем, если refresh не удался - wallet может быть актуальным
         
         # Создание нового питомца
-        new_pet = Pet(user_id=user_id, name=name, state=PetState.egg, health=HEALTH_MAX, status=PetLifeStatus.alive)
-        db.add(new_pet)
-        await db.commit()
-        await db.refresh(new_pet)
+        logger.info(f"🐾 Создание питомца: user_id={user_id}, name={name}")
+        try:
+            new_pet = Pet(user_id=user_id, name=name, state=PetState.egg, health=HEALTH_MAX, status=PetLifeStatus.alive)
+            db.add(new_pet)
+            await db.commit()
+            await db.refresh(new_pet)
+            logger.info(f"✅ Питомец создан: user_id={user_id}, name={name}, pet_id={new_pet.id}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при создании питомца: user_id={user_id}, name={name}, error={e}", exc_info=True)
+            raise
 
         # Подготовка стадий (сохранение creature_json и всех промтов в БД)
         try:
@@ -122,25 +140,30 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
             logger.warning(f"Ошибка отправки WebSocket обновления: {e}")
         
         # URL эндпоинта получения изображения (абсолютный URL для корректной загрузки с фронтенда)
-        from config.settings import get_pet_image_api_url, API_BASE_URL
-        base_url = API_BASE_URL if request is not None else None
-        image_url = get_pet_image_api_url(user_id, name, base_url)
-        
-        return {
-            "id": new_pet.id,
-            "user_id": new_pet.user_id,
-            "name": new_pet.name,
-            "state": new_pet.state.value,
-            "health": new_pet.health,
-            "image_url": image_url,
-            "wallet": {
-                "coins": wallet.coins,
-                "total_earned": wallet.total_earned,
-                "total_spent": wallet.total_spent
-            },
-            "paid": is_paid_creation_required,
-            "paid_cost": paid_cost
-        }
+        try:
+            from config.settings import get_pet_image_api_url, API_BASE_URL
+            base_url = API_BASE_URL if request is not None else None
+            image_url = get_pet_image_api_url(user_id, name, base_url)
+            
+            logger.info(f"✅ Создание питомца завершено успешно: user_id={user_id}, name={name}, pet_id={new_pet.id}")
+            return {
+                "id": new_pet.id,
+                "user_id": new_pet.user_id,
+                "name": new_pet.name,
+                "state": new_pet.state.value,
+                "health": new_pet.health,
+                "image_url": image_url,
+                "wallet": {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent
+                },
+                "paid": is_paid_creation_required,
+                "paid_cost": paid_cost
+            }
+        except Exception as e:
+            logger.error(f"❌ Ошибка при формировании ответа: user_id={user_id}, name={name}, error={e}", exc_info=True)
+            raise
     except HTTPException:
         raise
     except Exception as e:
