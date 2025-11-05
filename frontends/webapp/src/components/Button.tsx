@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
-export interface ButtonVariant1Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
@@ -10,7 +10,7 @@ export interface ButtonVariant1Props extends React.ButtonHTMLAttributes<HTMLButt
   iconPosition?: 'left' | 'right';
 }
 
-export default function ButtonVariant1({
+export default function Button({
   variant = 'default',
   size = 'md',
   loading = false,
@@ -20,8 +20,24 @@ export default function ButtonVariant1({
   className = '',
   disabled,
   ...props
-}: ButtonVariant1Props) {
+}: ButtonProps) {
   const isDisabled = disabled || loading;
+  
+  // Исключаем конфликтующие события, которые конфликтуют с Framer Motion
+  const {
+    onDrag,
+    onDragStart,
+    onDragEnd,
+    onDragEnter,
+    onDragExit,
+    onDragLeave,
+    onDragOver,
+    onDrop,
+    onAnimationStart,
+    onAnimationEnd,
+    onAnimationIteration,
+    ...safeProps
+  } = props;
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -85,7 +101,7 @@ export default function ButtonVariant1({
       whileHover={!isDisabled ? { scale: 1.02 } : {}}
       whileTap={!isDisabled ? { scale: 0.98 } : {}}
       style={{
-        background: variant === 'default' && !isDisabled
+        backgroundImage: variant === 'default' && !isDisabled
           ? 'linear-gradient(90deg, #2563eb, #9333ea, #ec4899, #2563eb)'
           : undefined,
         backgroundSize: variant === 'default' && !isDisabled ? '200% 100%' : undefined
@@ -104,7 +120,7 @@ export default function ButtonVariant1({
           ease: 'linear'
         }
       }}
-      {...props}
+      {...safeProps}
     >
       <span className="relative z-10 flex items-center justify-center gap-2">
         {loading ? (
@@ -133,4 +149,5 @@ export default function ButtonVariant1({
     </motion.button>
   );
 }
+
 

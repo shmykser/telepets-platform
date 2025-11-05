@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import FormCard from './FormCard';
-import ButtonVariant1 from './ButtonVariant1';
+import Button from './Button';
 import { Skull, Heart } from 'lucide-react';
 
 export interface AllDeadEnhancedProps {
@@ -74,13 +74,13 @@ export default function AllDeadEnhanced({
             </div>
           </div>
 
-          <ButtonVariant1
+          <Button
             onClick={onCreateClick}
             size="lg"
             className="w-full"
           >
             Создать нового питомца
-          </ButtonVariant1>
+          </Button>
         </div>
       </FormCard>
     </motion.div>

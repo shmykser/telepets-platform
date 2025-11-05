@@ -38,10 +38,12 @@ export function useTransactions(limit: number = 20) {
     data: transactionsData,
     isLoading,
     error,
-  } = useQuery({ queryKey: ['transactions', userId, limit], queryFn: () => economyApi.getTransactions(userId, limit), {
+  } = useQuery({ 
+    queryKey: ['transactions', userId, limit], 
+    queryFn: () => economyApi.getTransactions(userId, limit),
     refetchInterval: 60000, // Refetch every minute
     retry: 2,
-  }})
+  })
 
   return {
     transactions: transactionsData?.transactions || [],
@@ -58,10 +60,12 @@ export function useUserStats() {
     data: stats,
     isLoading,
     error,
-  } = useQuery({ queryKey: ['userStats', userId], queryFn: () => economyApi.getUserStats(userId), {
+  } = useQuery({ 
+    queryKey: ['userStats', userId], 
+    queryFn: () => economyApi.getUserStats(userId),
     refetchInterval: 60000, // Refetch every minute
     retry: 2,
-  }})
+  })
 
   return {
     stats,
@@ -75,10 +79,12 @@ export function useActionCosts() {
     data: actionCosts,
     isLoading,
     error,
-  } = useQuery({ queryKey: ['actionCosts'], queryFn: () => economyApi.getActionCosts(), {
+  } = useQuery({ 
+    queryKey: ['actionCosts'], 
+    queryFn: () => economyApi.getActionCosts(),
     refetchInterval: 300000, // Refetch every 5 minutes
     retry: 2,
-  }})
+  })
 
   return {
     actionCosts,

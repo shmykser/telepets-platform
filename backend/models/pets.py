@@ -22,6 +22,10 @@ class Pet(Base):
     image_egg_url = Column(String, nullable=True)
     image_baby_url = Column(String, nullable=True)
     image_adult_url = Column(String, nullable=True)
+    # URL'ы для изображений с прозрачным фоном (опциональные)
+    image_egg_transparent_url = Column(String, nullable=True)
+    image_baby_transparent_url = Column(String, nullable=True)
+    image_adult_transparent_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=True)
 

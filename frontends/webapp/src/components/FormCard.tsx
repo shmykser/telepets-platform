@@ -72,7 +72,7 @@ export default function FormCard({
         <div
           className="absolute -inset-0.5 rounded-3xl opacity-75 blur-xl"
           style={{
-            background: `linear-gradient(
+            backgroundImage: `linear-gradient(
               135deg,
               #60A5FA 0%,
               #34D399 25%,

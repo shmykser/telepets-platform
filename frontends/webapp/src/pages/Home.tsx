@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
 import PetCarouselEnhanced from '@/components/PetCarouselEnhanced';
 import QuickStatsHome from '@/components/QuickStatsHome';
-import ButtonVariant1 from '@/components/ButtonVariant1';
+import Button from '@/components/Button';
 import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
 import DialogEnhanced from '@/components/DialogEnhanced';
 import type { Pet } from '@/types';
@@ -166,13 +166,13 @@ export default function Home() {
             
           {/* Кнопка создания питомца */}
           <div className="flex-shrink-0 w-[120px] sm:w-1/2 lg:w-[30%] flex items-stretch">
-            <ButtonVariant1
+            <Button
               onClick={() => setIsCreateModalOpen(true)}
               className="w-full h-full min-h-[80px] md:min-h-[100px] flex flex-col items-center justify-center gap-2 text-sm md:text-base"
               icon={<Sparkles className="w-4 h-4 md:w-5 md:h-5" />}
                 >
               <span className="font-bold">Создание питомца</span>
-            </ButtonVariant1>
+            </Button>
           </div>
           </div>
 

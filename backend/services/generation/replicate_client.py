@@ -40,6 +40,7 @@ class ReplicateImageGenerator(ImageGeneratorProtocol):
         self,
         prompt: str,
         negative_prompt: Optional[str] = None,
+        output_format: Optional[str] = None,
         **kwargs,
     ) -> Optional[Image.Image]:
         # Map common kwargs -> replicate inputs for flux-1.1-pro
@@ -49,6 +50,9 @@ class ReplicateImageGenerator(ImageGeneratorProtocol):
         height = int(kwargs.get("height", quality.get("height", 1024)))
         steps = int(kwargs.get("steps", quality.get("steps", 30)))
         guidance = float(kwargs.get("guidance_scale", quality.get("guidance_scale", 8.5)))
+        
+        # Получаем формат из параметров или настроек
+        format_value = output_format or defaults.get("output_format", "webp")
 
         def _call(image_size: str):
             # Для flux-1.1-pro не передаём negative_prompt: часть сборок падает на этом параметре
@@ -57,7 +61,7 @@ class ReplicateImageGenerator(ImageGeneratorProtocol):
                 "image_size": image_size,
                 "num_inference_steps": steps,
                 "guidance": guidance,
-                "output_format": "png",
+                "output_format": format_value,  # Используем выбранный формат
             }
             logger.info("Replicate call %s with keys=%s", self.model, sorted(inputs.keys()))
             _w(f"call model={self.model} inputs={sorted(inputs.keys())}")

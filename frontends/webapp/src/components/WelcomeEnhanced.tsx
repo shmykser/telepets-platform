@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import FormCard from './FormCard';
-import ButtonVariant1 from './ButtonVariant1';
+import Button from './Button';
 import { Sparkles } from 'lucide-react';
 
 export interface WelcomeEnhancedProps {
@@ -43,14 +43,14 @@ export default function WelcomeEnhanced({
             🥚
           </motion.div>
 
-          <ButtonVariant1
+          <Button
             onClick={onCreateClick}
             size="lg"
             icon={<Sparkles className="w-5 h-5" />}
             className="w-full"
           >
             Создать питомца
-          </ButtonVariant1>
+          </Button>
         </div>
       </FormCard>
     </motion.div>

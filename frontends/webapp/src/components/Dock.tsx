@@ -133,7 +133,7 @@ function DockItem({
         <div
           className="absolute -inset-0.5 rounded-2xl opacity-50 blur-lg"
           style={{
-            background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 25%, #EC4899 50%, #F472B6 75%, #8B5CF6 100%)',
+            backgroundImage: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 25%, #EC4899 50%, #F472B6 75%, #8B5CF6 100%)',
             backgroundSize: '200% 200%',
             zIndex: -1,
             animation: 'gradientShift 4s ease infinite'
@@ -356,7 +356,7 @@ export default function Dock({
       <div
         className="absolute -inset-0.5 opacity-50 blur-xl pointer-events-none"
         style={{
-          background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 25%, #EC4899 50%, #F472B6 75%, #8B5CF6 100%)',
+          backgroundImage: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 25%, #EC4899 50%, #F472B6 75%, #8B5CF6 100%)',
           backgroundSize: '200% 200%',
           zIndex: -1,
           animation: 'gradientShift 4s ease infinite',

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
-export interface InputVariant1Props extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   success?: boolean;
@@ -10,7 +10,7 @@ export interface InputVariant1Props extends React.InputHTMLAttributes<HTMLInputE
   icon?: React.ReactNode;
 }
 
-export default function InputVariant1({
+export default function Input({
   label,
   error,
   success,
@@ -18,7 +18,7 @@ export default function InputVariant1({
   icon,
   className = '',
   ...props
-}: InputVariant1Props) {
+}: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
 
@@ -53,7 +53,7 @@ export default function InputVariant1({
               : 'opacity-0'
           }`}
           style={{
-            background: hasError
+            backgroundImage: hasError
               ? 'linear-gradient(135deg, #ef4444, #dc2626)'
               : hasSuccess
               ? 'linear-gradient(135deg, #10b981, #059669)'
@@ -132,4 +132,5 @@ export default function InputVariant1({
     </div>
   );
 }
+
 

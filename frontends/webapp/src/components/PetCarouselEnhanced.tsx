@@ -227,12 +227,12 @@ export default function PetCarouselEnhanced({
           <div className={`absolute inset-0 bg-gradient-to-br ${stageInfo.color} opacity-20`} />
           
 
-          <div className="relative w-full h-[65%] overflow-hidden">
+          <div className="relative w-full h-[65%] overflow-hidden rounded-t-3xl">
             {pet.image_url ? (
               <motion.img
                 src={pet.image_url}
                 alt={pet.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-t-3xl"
                 whileHover={{ scale: 1.1 }}
                 transition={{ duration: 0.3 }}
                 onError={(e) => {
@@ -244,51 +244,15 @@ export default function PetCarouselEnhanced({
               />
             ) : null}
             <div 
-              className="fallback absolute inset-0 flex items-center justify-center text-[10vmin] bg-gradient-to-br from-gray-800 to-gray-900"
+              className="fallback absolute inset-0 flex items-center justify-center text-[10vmin] bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-3xl"
               style={{ display: pet.image_url ? 'none' : 'flex' }}
             >
               {stageInfo.emoji}
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-              
-            <div className="absolute top-4 right-4">
-              <div className={`px-3 py-1.5 rounded-full backdrop-blur-md border ${
-                isDead 
-                  ? 'bg-red-500/30 border-red-500/50' 
-                  : 'bg-green-500/30 border-green-500/50'
-              }`}>
-                <span className="text-white text-xs font-semibold">
-                  {isDead ? '💀 Мёртв' : `❤️ ${healthPercentage}%`}
-                </span>
-              </div>
-            </div>
-
-            <div className="absolute top-4 left-4 flex items-center gap-2 sm:gap-3">
-              <div className="px-3 py-1.5 rounded-full backdrop-blur-md bg-white/10 border border-white/20">
-                <span className="text-white text-lg">{stageInfo.emoji}</span>
-              </div>
-              <div className="flex flex-col">
-                <h3 
-                  className="text-white text-base sm:text-lg font-bold leading-tight"
-                  style={{
-                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
-                  }}
-                >
-                  {pet.name}
-                </h3>
-                <p 
-                  className="text-gray-300 text-xs leading-tight"
-                  style={{
-                    textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
-                  }}
-                >
-                  {stageInfo.name}
-                </p>
-              </div>
-            </div>
           </div>
 
-          <div className="absolute top-[65%] left-0 right-0 bottom-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-0.5 sm:pb-1 bg-gradient-to-t from-gray-900 via-gray-900/95 to-transparent flex flex-col justify-start">
+          <div className="absolute top-[65%] left-0 right-0 bottom-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-0.5 sm:pb-1 bg-gradient-to-t from-gray-900 via-gray-900/95 to-transparent flex flex-col justify-start rounded-b-3xl">
 
             <div className="mb-3 sm:mb-4 flex-shrink-0">
               <div className="flex items-center justify-between text-xs text-gray-400 mb-1 sm:mb-2">
@@ -314,7 +278,7 @@ export default function PetCarouselEnhanced({
               <motion.button
                 className="w-full px-4 py-3 rounded-lg text-sm sm:text-base font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2"
                 style={{
-                  background: wallet && wallet.coins >= resurrectCost
+                  backgroundImage: wallet && wallet.coins >= resurrectCost
                     ? 'linear-gradient(90deg, #ec4899, #f43f5e, #dc2626, #ec4899)'
                     : 'linear-gradient(90deg, #6b7280, #4b5563, #374151, #6b7280)',
                   backgroundSize: wallet && wallet.coins >= resurrectCost ? '200% 100%' : '100% 100%',
@@ -342,7 +306,7 @@ export default function PetCarouselEnhanced({
                 <motion.button
                   className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
                   style={{
-                    background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6)',
+                    backgroundImage: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6)',
                     backgroundSize: '200% 100%'
                   }}
                   animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
@@ -359,7 +323,7 @@ export default function PetCarouselEnhanced({
                 <motion.button
                   className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
                   style={{
-                    background: 'linear-gradient(90deg, #a855f7, #ec4899, #f43f5e, #a855f7)',
+                    backgroundImage: 'linear-gradient(90deg, #a855f7, #ec4899, #f43f5e, #a855f7)',
                     backgroundSize: '200% 100%'
                   }}
                   animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
@@ -376,7 +340,7 @@ export default function PetCarouselEnhanced({
                 <motion.button
                   className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px]"
                   style={{
-                    background: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
+                    backgroundImage: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
                     backgroundSize: '200% 100%'
                   }}
                   animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
@@ -395,6 +359,69 @@ export default function PetCarouselEnhanced({
           </div>
 
         </motion.div>
+
+        {/* Передний слой с бейджами и текстом - выдвинут вперед, прямые дети motion.div с rotateY */}
+        {/* Бейдж здоровья справа */}
+        <div 
+          className="absolute right-7"
+          style={{
+            top: '7%',
+            transform: 'translateZ(80px)',
+            filter: 'drop-shadow(0 30px 60px rgba(0, 0, 0, 0.9))',
+            zIndex: 20
+          }}
+        >
+          <div className={`px-3 py-1.5 rounded-full backdrop-blur-md border ${
+            isDead 
+              ? 'bg-red-500/30 border-red-500/50' 
+              : 'bg-green-500/30 border-green-500/50'
+          }`}
+          style={{
+            boxShadow: '0 15px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+          }}>
+            <span className="text-white text-xs font-semibold">
+              {isDead ? '💀 Мёртв' : `❤️ ${healthPercentage}%`}
+            </span>
+          </div>
+        </div>
+
+        {/* Бейдж с именем и стадией слева */}
+        <div 
+          className="absolute left-7 flex items-center gap-2 sm:gap-3"
+          style={{
+            top: '7%',
+            transform: 'translateZ(80px)',
+            filter: 'drop-shadow(0 30px 60px rgba(0, 0, 0, 0.9))',
+            zIndex: 20
+          }}
+        >
+          <div 
+            className="px-3 py-1.5 rounded-full backdrop-blur-md bg-white/10 border border-white/20"
+            style={{
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <span className="text-white text-lg">{stageInfo.emoji}</span>
+          </div>
+          <div className="flex flex-col">
+            <h3 
+              className="text-white text-base sm:text-lg font-bold leading-tight"
+              style={{
+                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+              }}
+            >
+              {pet.name}
+            </h3>
+            <p 
+              className="text-gray-300 text-xs leading-tight"
+              style={{
+                textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+              }}
+            >
+              {stageInfo.name}
+            </p>
+          </div>
+        </div>
       </motion.div>
     );
   };
@@ -417,7 +444,8 @@ export default function PetCarouselEnhanced({
         background: 'transparent'
       }}
     >
-      <div className="relative" style={{ padding: '10px 0', maxWidth: '100%', overflow: 'hidden' }}>
+      {/* Контейнер с perspective - как .scene в 3d-ui.html */}
+      <div className="relative" style={{ padding: '10px 0', maxWidth: '100%', overflow: 'visible', perspective: '1200px', perspectiveOrigin: 'center center' }}>
         <motion.div
           className="flex"
           drag="x"
@@ -426,8 +454,6 @@ export default function PetCarouselEnhanced({
           dragMomentum={false}
           style={{
             gap: `${GAP}px`,
-            perspective: 1200,
-            perspectiveOrigin: `${currentIndex * trackItemOffset + itemWidth / 2}px 50%`,
             transformStyle: 'preserve-3d',
             x: adjustedX,
             width: 'max-content'

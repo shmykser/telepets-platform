@@ -388,7 +388,31 @@ GENERATION_DEFAULTS = {
     "provider": GENERATION_PROVIDER,
     "preferred_model": "flux-1.1-pro" if GENERATION_PROVIDER == "replicate" else "flux1-dev",
     "realism_style": "photorealistic",
-    "quality_preset": "high",
+    "quality_preset": "fast",
+    "output_format": "webp",  # Формат по умолчанию: webp
+}
+
+# Настройки постпроцессинга для удаления фона
+BACKGROUND_REMOVAL_SETTINGS = {
+    "enabled": os.getenv("BACKGROUND_REMOVAL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "y"},
+    "model": os.getenv("BACKGROUND_REMOVAL_MODEL", "rembg"),  # Модель по умолчанию (ключ из BACKGROUND_REMOVAL_MODELS)
+    "timeout": int(os.getenv("BACKGROUND_REMOVAL_TIMEOUT", "60")),
+}
+
+# Доступные модели для удаления фона
+BACKGROUND_REMOVAL_MODELS = {
+    "rembg": {
+        "model_id": "cjwbw/rembg",
+        "description": "Оригинальный rembg (автоматически получает последнюю версию)"
+    },
+    "clipdrop": {
+        "model_id": "levindabhi/clipdrop-remove-background",
+        "description": "Clipdrop background removal"
+    },
+    "rembg-api": {
+        "model_id": "levindabhi/rembg-api",
+        "description": "Alternative rembg implementation"
+    }
 }
 
 # Вспомогательные функции доступа к настройкам генерации
@@ -425,6 +449,38 @@ def get_generation_provider() -> str:
 def get_replicate_settings():
     return REPLICATE_SETTINGS.copy()
 
+def get_background_removal_settings():
+    """Возвращает настройки удаления фона"""
+    return BACKGROUND_REMOVAL_SETTINGS.copy()
+
+def get_background_removal_model(model_name: str = None):
+    """
+    Возвращает информацию о модели удаления фона.
+    
+    Args:
+        model_name: Имя модели (rembg, clipdrop, rembg-original). Если None, используется модель из настроек.
+    
+    Returns:
+        Словарь с информацией о модели (model_id, description)
+    """
+    if model_name:
+        return BACKGROUND_REMOVAL_MODELS.get(model_name, BACKGROUND_REMOVAL_MODELS["rembg"])
+    
+    settings = get_background_removal_settings()
+    model_key = settings.get("model", "rembg")  # Теперь это ключ из BACKGROUND_REMOVAL_MODELS
+    
+    # Если это ключ из словаря, возвращаем соответствующую модель
+    if model_key in BACKGROUND_REMOVAL_MODELS:
+        return BACKGROUND_REMOVAL_MODELS[model_key]
+    
+    # Если это старый формат (model_id), ищем по model_id
+    for key, model_info in BACKGROUND_REMOVAL_MODELS.items():
+        if model_info["model_id"] == model_key:
+            return model_info
+    
+    # Fallback на rembg
+    return BACKGROUND_REMOVAL_MODELS["rembg"]
+
 # ===== CLOUDFLARE R2 (S3-compatible) =====
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
@@ -447,26 +503,30 @@ def get_r2_config() -> dict:
         "signed_url_ttl": R2_SIGNED_URL_TTL,
     }
 
-def build_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
+def build_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "webp", transparent: bool = False) -> str:
     """
     Строит ключ для сохранения изображения питомца в R2.
     Использует централизованную конфигурацию R2_STORAGE_PREFIX.
     
-    Формат: {R2_STORAGE_PREFIX}{user_id}/{pet_name}/{stage}.{ext}
+    Формат: {R2_STORAGE_PREFIX}{user_id}/{pet_name}/{stage}[_transparent].{ext}
     
     Args:
         user_id: ID пользователя
         pet_name: Имя питомца
         stage_key: Стадия питомца (egg, baby, adult)
-        ext: Расширение файла (по умолчанию png)
+        ext: Расширение файла (по умолчанию webp)
+        transparent: Если True, добавляет суффикс "_transparent" для прозрачных изображений
     
     Returns:
-        Полный ключ для R2, например: "273065571/BHbh/baby.png" или "pets/273065571/BHbh/baby.png"
+        Полный ключ для R2, например: 
+        - "273065571/BHbh/baby.webp" (обычное)
+        - "273065571/BHbh/baby_transparent.webp" (прозрачное)
     """
     safe_user = user_id
     safe_pet = pet_name
     safe_stage = stage_key
-    base_path = f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    transparent_suffix = "_transparent" if transparent else ""
+    base_path = f"{safe_user}/{safe_pet}/{safe_stage}{transparent_suffix}.{ext}"
     return f"{R2_STORAGE_PREFIX}{base_path}"
 
 

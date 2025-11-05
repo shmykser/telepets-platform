@@ -15,6 +15,7 @@ from config.settings import (
 )
 from services.prompt_store import generate_and_store_prompts, load_prompts
 from services.generation.factory import get_image_generator
+from services.generation.background_removal import BackgroundRemovalService
 from services.r2_storage import R2Storage
 from config.settings import build_pet_image_key
 from generator.promt_gen import CreatureGenerator
@@ -68,6 +69,9 @@ class StageLifecycleService:
         stage_negative = get_stage_negative_prompt(stage_key, include_global=True)
         realism_prompt = get_realism_prompt(gen_defaults["realism_style"])  # type: ignore
         enhanced_prompt = f"{prompt_en}, {realism_prompt}, masterpiece, best quality, highly detailed, ultra detailed, 8k resolution, professional photography, natural lighting, realistic creature, detailed anatomy, natural environment, realistic proportions, detailed features, natural colors, realistic shadows, depth of field, natural pose"
+        
+        # Получаем формат из настроек
+        output_format = gen_defaults.get("output_format", "webp").lower()
 
         gen = get_image_generator()
         try:
@@ -81,6 +85,7 @@ class StageLifecycleService:
         img = gen.generate_image(
             enhanced_prompt,
             negative_prompt=stage_negative,
+            output_format=output_format,
             **quality_settings,
         )
 
@@ -111,8 +116,9 @@ class StageLifecycleService:
         safe_name = f"{user_id}_{pet_name}_{stage_key}_{preferred_model.replace('-', '_')}_{ts}"
         out_dir = get_file_settings()["output_dir"]
         os.makedirs(out_dir, exist_ok=True)
-        image_path = os.path.join(out_dir, f"{safe_name}.png")
-        img.save(image_path)
+        # Сохраняем в формате из настроек (по умолчанию webp)
+        image_path = os.path.join(out_dir, f"{safe_name}.{output_format}")
+        img.save(image_path, format=output_format.upper())
         try:
             with open('./logs/pipeline.log','a',encoding='utf-8') as _f:
                 _f.write(f"saved_png={image_path}\n")
@@ -186,27 +192,58 @@ class StageLifecycleService:
             realism_prompt = get_realism_prompt(gen_defaults["realism_style"])  # type: ignore
             egg_prompt = (stage_prompts.get("egg", {}) or {}).get("en") or "a single egg with subtle textures, photorealistic, studio lighting"
             enhanced_prompt = f"{egg_prompt}, {realism_prompt}, masterpiece, best quality, highly detailed, ultra detailed, 8k resolution, professional photography, natural lighting, realistic creature, detailed anatomy, natural environment, realistic proportions, detailed features, natural colors, realistic shadows, depth of field, natural pose"
+            
+            # Получаем формат из настроек
+            output_format = gen_defaults.get("output_format", "webp").lower()
 
             gen = get_image_generator()
             img = gen.generate_image(
                 enhanced_prompt,
                 negative_prompt=stage_negative,
+                output_format=output_format,
                 **quality_settings,
             )
             if img is not None:
                 from io import BytesIO
                 from services.r2_storage import R2Storage
                 from config.settings import build_pet_image_key
+                from services.generation.background_removal import BackgroundRemovalService
+                
+                # Сохраняем основное изображение в WebP
                 buf = BytesIO()
-                img.save(buf, format="PNG")
+                img.save(buf, format=output_format.upper())
                 raw = buf.getvalue()
-                key = build_pet_image_key(user_id, pet_name, "egg", ext="png")
-                url = R2Storage().upload_bytes(key, raw, "image/png")
-                # сохранить URL в БД
+                key = build_pet_image_key(user_id, pet_name, "egg", ext=output_format)
+                content_type = f"image/{output_format}"
+                url = R2Storage().upload_bytes(key, raw, content_type)
+                
+                # Сохранить URL основного изображения в БД
                 result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
                 pet = result.scalar_one_or_none()
                 if pet:
                     pet.image_egg_url = url
+                    
+                    # Удаляем фон (если включено)
+                    bg_removal_service = BackgroundRemovalService()
+                    if bg_removal_service.is_enabled():
+                        img_transparent = bg_removal_service.remove_background(img)
+                        
+                        if img_transparent:
+                            # Сохраняем изображение с прозрачным фоном в WebP
+                            buf_transparent = BytesIO()
+                            img_transparent.save(buf_transparent, format="WEBP")
+                            data_transparent = buf_transparent.getvalue()
+                            
+                            key_transparent = build_pet_image_key(
+                                user_id, pet_name, "egg", ext="webp", transparent=True
+                            )
+                            url_transparent = R2Storage().upload_bytes(
+                                key_transparent, data_transparent, "image/webp"
+                            )
+                            
+                            # Сохраняем URL прозрачного изображения в БД
+                            pet.image_egg_transparent_url = url_transparent
+                    
                     await db.commit()
             else:
                 # Fallback на альтернативный генератор SVG
@@ -253,18 +290,62 @@ class StageLifecycleService:
                 head = raw[:10]
                 if head.startswith(b"<?xml") or b"<svg" in head:
                     ext = 'svg'; content_type = 'image/svg+xml'
+                elif head.startswith(b"RIFF") and b"WEBP" in raw[:12]:
+                    ext = 'webp'; content_type = 'image/webp'
                 elif head.startswith(b"\x89PNG\r\n\x1a\n"):
                     ext = 'png'; content_type = 'image/png'
                 else:
-                    ext = 'png'; content_type = 'image/png'
+                    # По умолчанию используем webp
+                    ext = 'webp'; content_type = 'image/webp'
                 key = build_pet_image_key(user_id, pet_name, stage_key, ext=ext)
                 url = R2Storage().upload_bytes(key, raw, content_type)
+                
+                # Сохраняем URL основного изображения
                 if stage_key == 'egg':
                     pet.image_egg_url = url
                 elif stage_key == 'baby':
                     pet.image_baby_url = url
                 elif stage_key == 'adult':
                     pet.image_adult_url = url
+                
+                # Если это не SVG, пытаемся удалить фон
+                if ext != 'svg':
+                    try:
+                        from PIL import Image
+                        from io import BytesIO
+                        from services.generation.background_removal import BackgroundRemovalService
+                        
+                        # Загружаем изображение для удаления фона
+                        img = Image.open(BytesIO(raw))
+                        bg_removal_service = BackgroundRemovalService()
+                        if bg_removal_service.is_enabled():
+                            img_transparent = bg_removal_service.remove_background(img)
+                            
+                            if img_transparent:
+                                # Сохраняем изображение с прозрачным фоном в WebP
+                                buf_transparent = BytesIO()
+                                img_transparent.save(buf_transparent, format="WEBP")
+                                data_transparent = buf_transparent.getvalue()
+                                
+                                key_transparent = build_pet_image_key(
+                                    user_id, pet_name, stage_key, ext="webp", transparent=True
+                                )
+                                url_transparent = R2Storage().upload_bytes(
+                                    key_transparent, data_transparent, "image/webp"
+                                )
+                                
+                                # Сохраняем URL прозрачного изображения в БД
+                                if stage_key == 'egg':
+                                    pet.image_egg_transparent_url = url_transparent
+                                elif stage_key == 'baby':
+                                    pet.image_baby_transparent_url = url_transparent
+                                elif stage_key == 'adult':
+                                    pet.image_adult_transparent_url = url_transparent
+                    except Exception as bg_error:
+                        # Если удаление фона не удалось, продолжаем без него
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Background removal failed in persist_stage_artifacts: {bg_error}")
             except Exception:
                 pass
         await db.commit()
@@ -275,6 +356,10 @@ class StageLifecycleService:
         pet.image_egg_url = None
         pet.image_baby_url = None
         pet.image_adult_url = None
+        # Очищаем также URL прозрачных изображений
+        pet.image_egg_transparent_url = None
+        pet.image_baby_transparent_url = None
+        pet.image_adult_transparent_url = None
         await db.commit()
 
     # ===== Helpers =====
