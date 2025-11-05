@@ -154,6 +154,8 @@ class EconomyService:
             db.add(transaction)
             await db.commit()
             await db.refresh(transaction)
+            # Обновляем wallet после коммита, чтобы получить актуальные значения
+            await db.refresh(wallet)
             
             logger.info(f"Транзакция создана: {user_id} - {transaction_type.value} {amount} монет")
             return transaction

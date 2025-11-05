@@ -66,6 +66,9 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
             )
             if not spent:
                 raise HTTPException(status_code=500, detail="Не удалось списать монеты за создание питомца")
+            
+            # Обновляем объект wallet после транзакции
+            await db.refresh(wallet)
         
         # Создание нового питомца
         new_pet = Pet(user_id=user_id, name=name, state=PetState.egg, health=HEALTH_MAX, status=PetLifeStatus.alive)
