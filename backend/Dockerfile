@@ -34,7 +34,14 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
 
+# Создаем директорию cache перед копированием
+RUN mkdir -p /app/cache
+
 # Copy application code
+# Сначала копируем cache модуль явно, чтобы убедиться что он не игнорируется
+COPY cache/__init__.py /app/cache/__init__.py
+COPY cache/redis_client.py /app/cache/redis_client.py
+# Затем копируем остальной код
 COPY . .
 
 # Проверка наличия важных файлов (ПЕРЕД созданием пользователя, чтобы видеть ошибки)
@@ -45,7 +52,7 @@ RUN echo "=== Checking cache directory ===" && \
     echo "=== Checking __init__.py ===" && \
     ls -la /app/cache/__init__.py 2>&1 || echo "WARNING: __init__.py not found" && \
     echo "=== Testing Python import ===" && \
-    python -c "import cache; print('cache module found')" 2>&1 || echo "WARNING: cannot import cache module"
+    cd /app && python -c "import sys; sys.path.insert(0, '/app'); import cache; print('✅ cache module found')" 2>&1 || (echo "WARNING: cannot import cache module" && python -c "import sys; print('Python path:', sys.path)" 2>&1)
 
 # Non-root user
 RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app

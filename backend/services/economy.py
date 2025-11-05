@@ -152,12 +152,30 @@ class EconomyService:
             )
             
             db.add(transaction)
-            await db.commit()
-            await db.refresh(transaction)
-            # Обновляем wallet после коммита, чтобы получить актуальные значения
-            await db.refresh(wallet)
+            logger.info(f"📝 Добавление транзакции в сессию: user_id={user_id}, type={transaction_type.value}, amount={amount}")
+            try:
+                await db.commit()
+                logger.info(f"✅ Commit транзакции успешен: user_id={user_id}")
+            except Exception as commit_error:
+                logger.error(f"❌ Ошибка при commit транзакции: user_id={user_id}, error={commit_error}", exc_info=True)
+                raise
             
-            logger.info(f"Транзакция создана: {user_id} - {transaction_type.value} {amount} монет")
+            try:
+                await db.refresh(transaction)
+                logger.info(f"✅ Transaction refresh успешен: user_id={user_id}, transaction_id={transaction.id}")
+            except Exception as refresh_error:
+                logger.error(f"❌ Ошибка при refresh transaction: user_id={user_id}, error={refresh_error}", exc_info=True)
+                # Не падаем, если refresh не удался - транзакция уже закоммичена
+            
+            # Обновляем wallet после коммита, чтобы получить актуальные значения
+            try:
+                await db.refresh(wallet)
+                logger.info(f"✅ Wallet refresh успешен: user_id={user_id}, wallet.coins={wallet.coins}")
+            except Exception as wallet_refresh_error:
+                logger.error(f"❌ Ошибка при refresh wallet: user_id={user_id}, error={wallet_refresh_error}", exc_info=True)
+                # Не падаем, если refresh не удался - wallet может быть актуальным
+            
+            logger.info(f"✅ Транзакция создана успешно: user_id={user_id} - {transaction_type.value} {amount} монет, transaction_id={transaction.id}")
             return transaction
             
         except Exception as e:

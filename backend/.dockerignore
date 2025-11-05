@@ -40,15 +40,18 @@ data/
 *.db
 *.db-journal
 
-# Cache - игнорируем только изображения, но не Python модули!
+# Cache - игнорируем только изображения и данные, но не Python модули!
+# ВАЖНО: Сначала явно включаем нужные файлы, потом исключаем остальное
+!/cache/__init__.py
+!/cache/redis_client.py
+!/cache/README.md
+# Теперь исключаем ненужные файлы
 cache/pet_images/
 cache/*.json
 cache/*.svg
 cache/*.png
 cache/*.bin
-!/cache/__init__.py
-!/cache/redis_client.py
-!/cache/README.md
+cache/*.webp
 
 # Test files
 test_*
