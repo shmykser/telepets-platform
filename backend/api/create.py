@@ -49,9 +49,11 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
         # Создаем кошелек для пользователя (если его нет)
         wallet = await EconomyService.create_user_wallet(db, user_id)
 
+        # Определяем стоимость создания питомца (если требуется)
+        paid_cost = ACTION_COSTS.get('paid_pet', 500) if is_paid_creation_required else 0
+
         # Если требуется платное создание — списываем монеты
         if is_paid_creation_required:
-            paid_cost = ACTION_COSTS.get('paid_pet', 500)
             # Проверяем достаточность средств
             if wallet.coins < paid_cost:
                 raise HTTPException(status_code=400, detail=f"Недостаточно монет для создания питомца. Требуется: {paid_cost}, доступно: {wallet.coins}")
@@ -134,10 +136,12 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
                 "total_spent": wallet.total_spent
             },
             "paid": is_paid_creation_required,
-            "paid_cost": paid_cost if is_paid_creation_required else 0
+            "paid_cost": paid_cost
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка создания питомца: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка создания питомца") 
+        logger.error(f"Ошибка создания питомца: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Ошибка создания питомца: {str(e)}") 

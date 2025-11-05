@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import React from 'react';
@@ -25,6 +25,9 @@ export interface PetCarouselEnhancedProps {
 const DRAG_BUFFER = 50;
 const VELOCITY_THRESHOLD = 500;
 const GAP = 32;
+
+// Глобальный кэш для загруженных изображений
+const imageCache = new Set<string>();
 
 export default function PetCarouselEnhanced({
   pets = [],
@@ -153,12 +156,47 @@ export default function PetCarouselEnhanced({
     right: -centerOffsetForCalc
   };
 
-  const PetCard = ({ pet, index }: { pet: Pet; index: number }) => {
+  // Предзагрузка изображений для соседних карточек
+  useEffect(() => {
+    const preloadImages = () => {
+      const indicesToPreload = [
+        currentIndex - 1,
+        currentIndex,
+        currentIndex + 1
+      ].filter(idx => idx >= 0 && idx < pets.length);
+
+      indicesToPreload.forEach(idx => {
+        const pet = pets[idx];
+        if (pet?.image_url) {
+          // Используем объект Image для предзагрузки
+          const img = new Image();
+          img.src = pet.image_url;
+        }
+      });
+    };
+
+    preloadImages();
+  }, [currentIndex, pets]);
+
+  const PetCard = React.memo(({ pet, index }: { pet: Pet; index: number }) => {
     const isCardHovered = hoveredCardId === pet.id?.toString();
+    const imgRef = useRef<HTMLImageElement>(null);
     
     const range = [-(index + 1) * trackItemOffset, -index * trackItemOffset, -(index - 1) * trackItemOffset];
     const outputRange = [75, 0, -75];
     const carouselRotateY = useTransform(x, range, outputRange, { clamp: false });
+
+    // Мемоизируем image_url для стабильности
+    const imageUrl = useMemo(() => pet.image_url, [pet.image_url]);
+
+    // Предзагружаем изображение в кэш при первом рендере
+    useEffect(() => {
+      if (imageUrl && !imageCache.has(imageUrl)) {
+        imageCache.add(imageUrl);
+        const img = new Image();
+        img.src = imageUrl;
+      }
+    }, [imageUrl]);
 
     const handleMouseLeave = () => {
       setHoveredCardId(null);
@@ -201,7 +239,10 @@ export default function PetCarouselEnhanced({
           rotateY: carouselRotateY,
           transformStyle: 'preserve-3d',
           zIndex: isCardHovered ? 50 : 1,
-          overflow: 'visible'
+          overflow: 'visible',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden'
         }}
         onMouseEnter={() => setHoveredCardId(pet.id?.toString() ?? null)}
         onMouseLeave={handleMouseLeave}
@@ -228,24 +269,57 @@ export default function PetCarouselEnhanced({
           
 
           <div className="relative w-full h-[65%] overflow-hidden rounded-t-3xl">
-            {pet.image_url ? (
-              <motion.img
-                src={pet.image_url}
-                alt={pet.name}
-                className="w-full h-full object-cover rounded-t-3xl"
+            {imageUrl ? (
+              <motion.div
+                className="w-full h-full"
                 whileHover={{ scale: 1.1 }}
                 transition={{ duration: 0.3 }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const fallback = target.parentElement?.querySelector('.fallback') as HTMLElement;
-                  if (fallback) fallback.style.display = 'flex';
+                style={{ 
+                  originX: 0.5, 
+                  originY: 0.5,
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden'
                 }}
-              />
+              >
+                <img
+                  ref={imgRef}
+                  src={imageUrl}
+                  alt={pet.name || 'Pet'}
+                  className="w-full h-full object-cover rounded-t-3xl"
+                  style={{ 
+                    opacity: 1,
+                    willChange: 'auto',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    transform: 'translateZ(0)',
+                    imageRendering: 'auto',
+                    display: 'block',
+                    visibility: 'visible',
+                    contentVisibility: 'auto',
+                    containIntrinsicSize: 'auto'
+                  }}
+                  loading="eager"
+                  decoding="async"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.parentElement?.parentElement?.querySelector('.fallback') as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                  onLoad={(e) => {
+                    // Убеждаемся, что изображение загружено и отображается
+                    const img = e.target as HTMLImageElement;
+                    img.style.opacity = '1';
+                    img.style.display = 'block';
+                    img.style.visibility = 'visible';
+                  }}
+                />
+              </motion.div>
             ) : null}
             <div 
               className="fallback absolute inset-0 flex items-center justify-center text-[10vmin] bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-3xl"
-              style={{ display: pet.image_url ? 'none' : 'flex' }}
+              style={{ display: imageUrl ? 'none' : 'flex' }}
             >
               {stageInfo.emoji}
             </div>
@@ -424,7 +498,22 @@ export default function PetCarouselEnhanced({
         </div>
       </motion.div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Кастомная функция сравнения для React.memo
+    // Возвращает true если НЕ нужно ре-рендерить (пропсы одинаковые)
+    const petUnchanged = 
+      prevProps.pet.id === nextProps.pet.id &&
+      prevProps.pet.image_url === nextProps.pet.image_url &&
+      prevProps.pet.name === nextProps.pet.name &&
+      prevProps.pet.health === nextProps.pet.health &&
+      prevProps.pet.status === nextProps.pet.status &&
+      prevProps.pet.state === nextProps.pet.state;
+    
+    const indexUnchanged = prevProps.index === nextProps.index;
+    
+    // Не ре-рендерим если pet и index не изменились
+    return petUnchanged && indexUnchanged;
+  });
 
   if (pets.length === 0) {
     return <div className={`text-center text-gray-400 ${className}`}>Нет питомцев</div>;
@@ -468,7 +557,7 @@ export default function PetCarouselEnhanced({
           }}
         >
           {pets.map((pet, index) => (
-            <PetCard key={pet.id ?? index} pet={pet} index={index} />
+            <PetCard key={pet.id ?? pet.name ?? index} pet={pet} index={index} />
           ))}
         </motion.div>
       </div>

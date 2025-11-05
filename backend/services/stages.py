@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import json
 import asyncio
+import logging
 from typing import Optional, Tuple, Dict, Any
 
 from config.settings import (
@@ -12,6 +13,7 @@ from config.settings import (
     get_quality_settings,
     get_stage_negative_prompt,
     get_realism_prompt,
+    HEALTH_MAX,
 )
 from services.prompt_store import generate_and_store_prompts, load_prompts
 from services.generation.factory import get_image_generator
@@ -23,6 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models import Pet, PetState
 from services.generation.alternative_generator import pet_generator_alternative
+
+logger = logging.getLogger(__name__)
 
 
 class StageLifecycleService:
@@ -343,8 +347,6 @@ class StageLifecycleService:
                                     pet.image_adult_transparent_url = url_transparent
                     except Exception as bg_error:
                         # Если удаление фона не удалось, продолжаем без него
-                        import logging
-                        logger = logging.getLogger(__name__)
                         logger.warning(f"Background removal failed in persist_stage_artifacts: {bg_error}")
             except Exception:
                 pass

@@ -70,13 +70,19 @@ export default function Home() {
   }, []);
 
   // Подготовка данных питомцев с изображениями
+  // Мемоизируем с стабильными ссылками на изображения
   const transformedPets: Pet[] = useMemo(() => {
-    return pets.map(pet => ({
-      ...pet,
-      image_url: pet.image_url || (pet.name && userId 
+    return pets.map(pet => {
+      // Используем существующий image_url если он есть, иначе генерируем
+      const imageUrl = pet.image_url || (pet.name && userId 
         ? buildUrl.petImage(userId, pet.name) + (pet.state ? `?stage=${pet.state}` : '')
-        : undefined)
-    }));
+        : undefined);
+      
+      return {
+        ...pet,
+        image_url: imageUrl
+      };
+    });
   }, [pets, userId]);
 
   // Обработчики действий

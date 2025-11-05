@@ -180,7 +180,14 @@ async def get_pet_image(
                     # Если файл не найден - продолжаем выполнение для генерации нового изображения
                     # (код ниже обработает это)
         
-        return RedirectResponse(existing_url, status_code=307)
+        # Fallback: если проксирование не удалось или URL не из R2, делаем редирект с заголовками кэширования
+        return RedirectResponse(
+            existing_url, 
+            status_code=307,
+            headers={
+                "Cache-Control": "public, max-age=604800, immutable",
+            }
+        )
 
     # Генерация через реплику и ПРЯМАЯ загрузка в R2 (без локальных файлов и без base64)
     prompt_en = _ensure_prompt(user_id, pet_name, stage_key)
@@ -274,18 +281,28 @@ async def get_pet_image(
         if transparent and img_transparent:
             url = url_transparent
 
-    # Проксируем через backend для CORS, если URL из R2
+    # Всегда проксируем через backend для правильных заголовков кэширования
     if "r2.cloudflarestorage.com" in url:
         return await _proxy_r2_image(url, stage_key)
     
-    return RedirectResponse(url, status_code=307)
+    # Fallback: редирект с заголовками кэширования
+    return RedirectResponse(
+        url, 
+        status_code=307,
+        headers={
+            "Cache-Control": "public, max-age=604800, immutable",
+        }
+    )
 
 
 async def _proxy_r2_image(r2_url: str, stage_key: str) -> Response:
     """
     Проксирует изображение из R2 через backend с правильными CORS заголовками.
     Решает проблему CORS, когда R2 бакет не настроен на CORS.
+    Добавляет агрессивное кэширование для уменьшения количества запросов.
     """
+    import hashlib
+    
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(r2_url)
@@ -302,18 +319,33 @@ async def _proxy_r2_image(r2_url: str, stage_key: str) -> Response:
                 else:
                     content_type = "image/webp"  # По умолчанию WebP
             
-            # Возвращаем изображение с правильными CORS заголовками
+            # Генерируем ETag на основе URL изображения для валидации кэша
+            etag = hashlib.md5(r2_url.encode()).hexdigest()
+            
+            # Получаем Last-Modified из исходного ответа R2, если есть
+            last_modified = response.headers.get("Last-Modified")
+            
+            # Возвращаем изображение с правильными CORS заголовками и агрессивным кэшированием
+            headers = {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                # Агрессивное кэширование: 7 дней (604800 секунд)
+                # Изображения питомцев не меняются часто, поэтому можно кэшировать долго
+                "Cache-Control": "public, max-age=604800, immutable",
+                "ETag": f'"{etag}"',
+                "X-Pet-Stage": stage_key,
+                "X-Pet-Source": "r2_proxied",
+            }
+            
+            # Добавляем Last-Modified если есть
+            if last_modified:
+                headers["Last-Modified"] = last_modified
+            
             return Response(
                 content=response.content,
                 media_type=content_type,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                    "Cache-Control": "public, max-age=86400",  # Кеш на 1 день
-                    "X-Pet-Stage": stage_key,
-                    "X-Pet-Source": "r2_proxied",
-                }
+                headers=headers
             )
     except httpx.HTTPStatusError as e:
         # Преобразуем HTTP ошибки в HTTPException с правильным статус кодом
