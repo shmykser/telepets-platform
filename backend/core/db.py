@@ -41,10 +41,11 @@ AsyncSessionLocal = sessionmaker(
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Для SQLite добавим недостающие колонки image_*_url (быстрая стартовая миграция)
+        # Для SQLite добавляем недостающие колонки image_*_url (только для локальной разработки)
+        # В production (PostgreSQL/Supabase) все изменения схемы должны идти через Alembic миграции
         if async_database_url.startswith("sqlite+"):
             try:
-                def _ensure_cols(sync_conn):
+                def _ensure_cols_sqlite(sync_conn):
                     cols = sync_conn.exec_driver_sql("PRAGMA table_info(pets)").fetchall()
                     names = {c[1] for c in cols}
                     ddl = []
@@ -54,6 +55,13 @@ async def init_db():
                         ddl.append("ALTER TABLE pets ADD COLUMN image_baby_url VARCHAR")
                     if 'image_adult_url' not in names:
                         ddl.append("ALTER TABLE pets ADD COLUMN image_adult_url VARCHAR")
+                    # Прозрачные изображения
+                    if 'image_egg_transparent_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_egg_transparent_url VARCHAR")
+                    if 'image_baby_transparent_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_baby_transparent_url VARCHAR")
+                    if 'image_adult_transparent_url' not in names:
+                        ddl.append("ALTER TABLE pets ADD COLUMN image_adult_transparent_url VARCHAR")
                     # Удаляем legacy base64-колонки, если существуют (SQLite не умеет DROP COLUMN до 3.35 — пробуем, иначе игнор)
                     drop_candidates = ['image_egg_b64','image_baby_b64','image_adult_b64']
                     for col in drop_candidates:
@@ -64,9 +72,11 @@ async def init_db():
                                 pass
                     for stmt in ddl:
                         sync_conn.exec_driver_sql(stmt)
-                await conn.run_sync(_ensure_cols)
+                await conn.run_sync(_ensure_cols_sqlite)
             except Exception:
                 pass
+        # Для PostgreSQL (включая Supabase) НЕ создаем колонки автоматически
+        # Все изменения схемы должны применяться через Alembic миграции
 
 async def get_db():
     async with AsyncSessionLocal() as session:

@@ -133,12 +133,12 @@ async def get_pet_image(
             
             # Используем найденный ключ или новый формат по умолчанию
             signed = r2_storage.make_url(found_key if found_key else key)
-            # Сохраняем URL в БД
-            if stage_key == "egg":
+            # Сохраняем URL в БД (проверяем наличие атрибутов для обратной совместимости)
+            if hasattr(pet, 'image_egg_url') and stage_key == "egg":
                 pet.image_egg_url = signed
-            elif stage_key == "baby":
+            elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
                 pet.image_baby_url = signed
-            else:
+            elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
                 pet.image_adult_url = signed
             await db.commit()
             existing_url = signed
@@ -168,11 +168,11 @@ async def get_pet_image(
                     if found_key:
                         # Файл найден - генерируем новый URL и сохраняем
                         new_url = r2_storage.make_url(found_key)
-                        if stage_key == "egg":
+                        if hasattr(pet, 'image_egg_url') and stage_key == "egg":
                             pet.image_egg_url = new_url
-                        elif stage_key == "baby":
+                        elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
                             pet.image_baby_url = new_url
-                        else:
+                        elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
                             pet.image_adult_url = new_url
                         await db.commit()
                         # Пробуем получить изображение
@@ -220,12 +220,12 @@ async def get_pet_image(
             key = build_pet_image_key(user_id, pet_name, stage_key, ext="svg")
             url = R2Storage().upload_bytes(key, svg_data, "image/svg+xml")
             
-            # Сохраняем URL в БД
-            if stage_key == "egg":
+            # Сохраняем URL в БД (проверяем наличие атрибутов)
+            if hasattr(pet, 'image_egg_url') and stage_key == "egg":
                 pet.image_egg_url = url
-            elif stage_key == "baby":
+            elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
                 pet.image_baby_url = url
-            else:
+            elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
                 pet.image_adult_url = url
             await db.commit()
         except Exception as fallback_error:
@@ -240,12 +240,12 @@ async def get_pet_image(
         content_type = f"image/{output_format}"
         url = R2Storage().upload_bytes(key, data, content_type)
         
-        # Сохраняем URL основного изображения в БД
-        if stage_key == "egg":
+        # Сохраняем URL основного изображения в БД (проверяем наличие атрибутов)
+        if hasattr(pet, 'image_egg_url') and stage_key == "egg":
             pet.image_egg_url = url
-        elif stage_key == "baby":
+        elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
             pet.image_baby_url = url
-        else:
+        elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
             pet.image_adult_url = url
         
         # Удаляем фон (если включено)
@@ -267,12 +267,12 @@ async def get_pet_image(
                     key_transparent, data_transparent, "image/webp"
                 )
                 
-                # Сохраняем URL прозрачного изображения в БД
-                if stage_key == "egg":
+                # Сохраняем URL прозрачного изображения в БД (проверяем наличие атрибутов)
+                if hasattr(pet, 'image_egg_transparent_url') and stage_key == "egg":
                     pet.image_egg_transparent_url = url_transparent
-                elif stage_key == "baby":
+                elif hasattr(pet, 'image_baby_transparent_url') and stage_key == "baby":
                     pet.image_baby_transparent_url = url_transparent
-                else:
+                elif hasattr(pet, 'image_adult_transparent_url') and stage_key == "adult":
                     pet.image_adult_transparent_url = url_transparent
         
         await db.commit()
@@ -473,12 +473,12 @@ async def remove_background_from_existing_image(
                     key_transparent, data_transparent, "image/webp"
                 )
                 
-                # Сохраняем URL прозрачного изображения в БД
-                if stage_key == "egg":
+                # Сохраняем URL прозрачного изображения в БД (проверяем наличие атрибутов)
+                if hasattr(pet, 'image_egg_transparent_url') and stage_key == "egg":
                     pet.image_egg_transparent_url = url_transparent
-                elif stage_key == "baby":
+                elif hasattr(pet, 'image_baby_transparent_url') and stage_key == "baby":
                     pet.image_baby_transparent_url = url_transparent
-                else:
+                elif hasattr(pet, 'image_adult_transparent_url') and stage_key == "adult":
                     pet.image_adult_transparent_url = url_transparent
                 
                 processed.append({

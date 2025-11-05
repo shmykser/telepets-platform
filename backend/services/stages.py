@@ -225,7 +225,9 @@ class StageLifecycleService:
                 result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
                 pet = result.scalar_one_or_none()
                 if pet:
-                    pet.image_egg_url = url
+                    # Проверяем наличие атрибута перед записью (для обратной совместимости)
+                    if hasattr(pet, 'image_egg_url'):
+                        pet.image_egg_url = url
                     
                     # Удаляем фон (если включено)
                     bg_removal_service = BackgroundRemovalService()
@@ -245,8 +247,9 @@ class StageLifecycleService:
                                 key_transparent, data_transparent, "image/webp"
                             )
                             
-                            # Сохраняем URL прозрачного изображения в БД
-                            pet.image_egg_transparent_url = url_transparent
+                            # Сохраняем URL прозрачного изображения в БД (если поле существует)
+                            if hasattr(pet, 'image_egg_transparent_url'):
+                                pet.image_egg_transparent_url = url_transparent
                     
                     await db.commit()
             else:
@@ -265,7 +268,9 @@ class StageLifecycleService:
                 result = await db.execute(select(Pet).where(Pet.user_id == user_id, Pet.name == pet_name))
                 pet = result.scalar_one_or_none()
                 if pet:
-                    pet.image_egg_url = url
+                    # Проверяем наличие атрибута перед записью (для обратной совместимости)
+                    if hasattr(pet, 'image_egg_url'):
+                        pet.image_egg_url = url
                     await db.commit()
         except Exception as e:
             logger.error(f"Ошибка генерации изображения для {pet_name}: {e}")
@@ -304,12 +309,12 @@ class StageLifecycleService:
                 key = build_pet_image_key(user_id, pet_name, stage_key, ext=ext)
                 url = R2Storage().upload_bytes(key, raw, content_type)
                 
-                # Сохраняем URL основного изображения
-                if stage_key == 'egg':
+                # Сохраняем URL основного изображения (проверяем наличие атрибутов)
+                if hasattr(pet, 'image_egg_url') and stage_key == 'egg':
                     pet.image_egg_url = url
-                elif stage_key == 'baby':
+                elif hasattr(pet, 'image_baby_url') and stage_key == 'baby':
                     pet.image_baby_url = url
-                elif stage_key == 'adult':
+                elif hasattr(pet, 'image_adult_url') and stage_key == 'adult':
                     pet.image_adult_url = url
                 
                 # Если это не SVG, пытаемся удалить фон
@@ -338,12 +343,12 @@ class StageLifecycleService:
                                     key_transparent, data_transparent, "image/webp"
                                 )
                                 
-                                # Сохраняем URL прозрачного изображения в БД
-                                if stage_key == 'egg':
+                                # Сохраняем URL прозрачного изображения в БД (проверяем наличие атрибутов)
+                                if hasattr(pet, 'image_egg_transparent_url') and stage_key == 'egg':
                                     pet.image_egg_transparent_url = url_transparent
-                                elif stage_key == 'baby':
+                                elif hasattr(pet, 'image_baby_transparent_url') and stage_key == 'baby':
                                     pet.image_baby_transparent_url = url_transparent
-                                elif stage_key == 'adult':
+                                elif hasattr(pet, 'image_adult_transparent_url') and stage_key == 'adult':
                                     pet.image_adult_transparent_url = url_transparent
                     except Exception as bg_error:
                         # Если удаление фона не удалось, продолжаем без него
@@ -355,13 +360,20 @@ class StageLifecycleService:
     @staticmethod
     async def wipe_images_on_death(db: AsyncSession, pet: Pet) -> None:
         # Очищаем URL изображений при смерти питомца (изображения остаются в R2, но ссылки удаляются)
-        pet.image_egg_url = None
-        pet.image_baby_url = None
-        pet.image_adult_url = None
+        # Проверяем наличие атрибутов для обратной совместимости
+        if hasattr(pet, 'image_egg_url'):
+            pet.image_egg_url = None
+        if hasattr(pet, 'image_baby_url'):
+            pet.image_baby_url = None
+        if hasattr(pet, 'image_adult_url'):
+            pet.image_adult_url = None
         # Очищаем также URL прозрачных изображений
-        pet.image_egg_transparent_url = None
-        pet.image_baby_transparent_url = None
-        pet.image_adult_transparent_url = None
+        if hasattr(pet, 'image_egg_transparent_url'):
+            pet.image_egg_transparent_url = None
+        if hasattr(pet, 'image_baby_transparent_url'):
+            pet.image_baby_transparent_url = None
+        if hasattr(pet, 'image_adult_transparent_url'):
+            pet.image_adult_transparent_url = None
         await db.commit()
 
     # ===== Helpers =====
