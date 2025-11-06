@@ -67,3 +67,5 @@ resp = requests.get(url, timeout=self.timeout, headers=headers)
 - Конвертация: Сохраняется в WebP формат
 
 
+
+

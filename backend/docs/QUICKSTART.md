@@ -107,9 +107,32 @@ alembic upgrade head
 
 ### Способ 1: Использование uvicorn напрямую
 
+**Linux/Mac/Git Bash:**
 ```bash
 cd telepets-platform/backend
+# Для локальной разработки используйте ENVIRONMENT=development (SQLite)
+ENVIRONMENT=development uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+**Windows CMD:**
+```cmd
+cd telepets-platform\backend
+set ENVIRONMENT=development
 uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+**Windows PowerShell:**
+```powershell
+cd telepets-platform\backend
+$env:ENVIRONMENT="development"
+uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+**Важно:** Если не установить `ENVIRONMENT=development`, система будет пытаться подключиться к PostgreSQL. Для локальной разработки используйте SQLite.
+
+**Альтернатива:** Создайте файл `.env` в директории `backend/` с содержимым:
+```env
+ENVIRONMENT=development
 ```
 
 Флаг `--reload` включает автоперезагрузку при изменении кода.

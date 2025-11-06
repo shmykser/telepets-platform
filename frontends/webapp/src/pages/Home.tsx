@@ -1,14 +1,12 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
 import PetCarouselEnhanced from '@/components/PetCarouselEnhanced';
-import QuickStatsHome from '@/components/QuickStatsHome';
-import Button from '@/components/Button';
+import QuickStatsVariants from '@/components/QuickStatsVariants';
 import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
 import DialogEnhanced from '@/components/DialogEnhanced';
 import type { Pet } from '@/types';
 import { buildUrl } from '@/config/endpoints';
 import { getStoredUserId } from '@/utils';
-import { Sparkles } from 'lucide-react';
 
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
@@ -150,37 +148,24 @@ export default function Home() {
     <div 
       className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] px-4 sm:px-6 overflow-x-hidden flex flex-col"
       style={{ 
-        paddingTop: '1rem', 
-        paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', 
-        minHeight: '100vh', 
+        minHeight: '-webkit-fill-available',
         maxWidth: '100vw' 
       }}
     >
       <div className="max-w-7xl mx-auto w-full overflow-x-hidden flex flex-col flex-1">
         {/* Верхняя секция: быстрые статусы и кнопка создания */}
-        <div className="mb-4 md:mb-6 flex flex-row gap-2 sm:gap-3 md:gap-4">
-          {/* Быстрые статусы */}
-          <div className="flex-1 min-w-0 sm:w-1/2 lg:w-[70%]">
-            <QuickStatsHome
-              totalPets={totalPets || 0}
-              alivePets={alivePets || 0}
-              deadPets={deadPets || 0}
-              coins={wallet?.coins || 0}
-              layout="grid-2x2"
-              />
-            </div>
-            
-          {/* Кнопка создания питомца */}
-          <div className="flex-shrink-0 w-[120px] sm:w-1/2 lg:w-[30%] flex items-stretch">
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="w-full h-full min-h-[80px] md:min-h-[100px] flex flex-col items-center justify-center gap-2 text-sm md:text-base"
-              icon={<Sparkles className="w-4 h-4 md:w-5 md:h-5" />}
-                >
-              <span className="font-bold">Создание питомца</span>
-            </Button>
-          </div>
-          </div>
+        <div className="mb-4 md:mb-6">
+          <QuickStatsVariants
+            stats={{
+              totalPets: totalPets || 0,
+              alivePets: alivePets || 0,
+              deadPets: deadPets || 0,
+              coins: wallet?.coins || 0
+            }}
+            onCreatePet={() => setIsCreateModalOpen(true)}
+            variant={1}
+          />
+        </div>
 
         {/* Карусель питомцев */}
         <div className="w-full flex-1 flex items-center justify-center min-h-0">
