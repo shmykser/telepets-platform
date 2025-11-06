@@ -132,3 +132,4 @@ if __name__ == "__main__":
     success = test_rembg_formats()
     sys.exit(0 if success else 1)
 
+

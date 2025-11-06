@@ -66,3 +66,4 @@ resp = requests.get(url, timeout=self.timeout, headers=headers)
 - Формат результата: PNG с прозрачным фоном (RGBA)
 - Конвертация: Сохраняется в WebP формат
 
+

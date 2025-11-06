@@ -179,7 +179,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # ===== НАСТРОЙКИ БАЗЫ ДАННЫХ =====
 # Определяем режим разработки
-IS_DEV = os.getenv("ENVIRONMENT", "development").lower() in ["dev", "development", "local"]
+# ВАЖНО: По умолчанию используем production режим, чтобы не было проблем на сервере
+# Для dev режима явно устанавливайте ENVIRONMENT=development
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
+IS_DEV = ENVIRONMENT in ["dev", "development", "local"]
 
 # Выбираем базу данных в зависимости от режима
 if IS_DEV:
