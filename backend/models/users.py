@@ -53,12 +53,12 @@ class Transaction(Base):
     __tablename__ = 'transactions'
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey('users.user_id'), nullable=False)
-    transaction_type = Column(Enum(TransactionType), nullable=False)
+    transaction_type = Column(Enum(TransactionType, name='transaction_type'), nullable=False)
     amount = Column(Integer, nullable=False)
     balance_before = Column(Integer, nullable=False)
     balance_after = Column(Integer, nullable=False)
     description = Column(String, nullable=False)
-    status = Column(Enum(TransactionStatus), default=TransactionStatus.completed)
+    status = Column(Enum(TransactionStatus, name='transaction_status'), default=TransactionStatus.completed)
     transaction_data = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

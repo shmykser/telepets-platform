@@ -67,12 +67,19 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
                     transaction_data={"action": "create_pet", "pet_name": name}
                 )
                 if not spent:
-                    logger.error(f"❌ spend_coins вернул None для user_id={user_id}, name={name}")
+                    logger.error(f"❌ spend_coins вернул False для user_id={user_id}, name={name}")
                     raise HTTPException(status_code=500, detail="Не удалось списать монеты за создание питомца")
                 logger.info(f"✅ Монеты списаны успешно: user_id={user_id}, name={name}")
+            except HTTPException:
+                # Пробрасываем HTTPException без изменений
+                raise
             except Exception as e:
                 logger.error(f"❌ Ошибка при списании монет: user_id={user_id}, name={name}, error={e}", exc_info=True)
-                raise HTTPException(status_code=500, detail=f"Ошибка при списании монет: {str(e)}")
+                import traceback
+                error_details = str(e) if str(e) else repr(e)
+                error_traceback = traceback.format_exc()
+                logger.error(f"❌ Traceback при списании монет: {error_traceback}")
+                raise HTTPException(status_code=500, detail=f"Ошибка при списании монет: {error_details}")
             
             # Обновляем объект wallet после транзакции
             try:

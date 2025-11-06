@@ -202,8 +202,9 @@ class EconomyService:
             )
             return True
         except Exception as e:
-            logger.error(f"Ошибка траты монет: {e}")
-            return False
+            logger.error(f"Ошибка траты монет: user_id={user_id}, amount={amount}, error={e}", exc_info=True)
+            # Пробрасываем исключение, чтобы видеть детали ошибки
+            raise
     
     @staticmethod
     async def add_coins(
