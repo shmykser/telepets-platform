@@ -10,7 +10,7 @@ export default function Header({ onCreatePet }: HeaderProps) {
     <header 
       className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 sm:py-3"
       style={{ 
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+        paddingTop: 'calc(var(--tg-content-safe-area-inset-top, var(--safe-area-inset-top, 0px)) + 0.5rem)',
         background: 'linear-gradient(to bottom, rgba(10, 10, 10, 0.95) 0%, rgba(10, 10, 10, 0.8) 70%, transparent 100%)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)'

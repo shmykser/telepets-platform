@@ -321,7 +321,9 @@ export default function Dock({
       className={`${className} dock-container`}
       style={{
         position: 'fixed',
-        bottom: screenWidth < 640 ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 'calc(16px + env(safe-area-inset-bottom, 0px))',
+        bottom: screenWidth < 640 
+          ? 'calc(8px + var(--tg-content-safe-area-inset-bottom, var(--safe-area-inset-bottom, 0px)))' 
+          : 'calc(16px + var(--tg-content-safe-area-inset-bottom, var(--safe-area-inset-bottom, 0px)))',
         left: '50%',
         right: 'auto',
         transform: 'translateX(-50%)',

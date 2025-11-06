@@ -24,19 +24,27 @@ export default function Home() {
   const [carouselSizes, setCarouselSizes] = useState({ baseWidth: 380, cardHeight: 500 });
   const [statsHeight, setStatsHeight] = useState(0);
   const [dockHeight, setDockHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(56); // Начальная высота Header
 
-  // Измеряем высоту QuickStatsVariants
+  // Измеряем высоту QuickStatsVariants и Header
   useLayoutEffect(() => {
-    const updateStatsHeight = () => {
+    const updateHeights = () => {
       if (statsRef.current) {
         const height = statsRef.current.getBoundingClientRect().height;
         setStatsHeight(height);
       }
+      
+      // Измеряем реальную высоту Header (включая safe area)
+      const headerElement = document.querySelector('header');
+      if (headerElement) {
+        const height = headerElement.getBoundingClientRect().height;
+        setHeaderHeight(height);
+      }
     };
 
-    updateStatsHeight();
-    window.addEventListener('resize', updateStatsHeight);
-    return () => window.removeEventListener('resize', updateStatsHeight);
+    updateHeights();
+    window.addEventListener('resize', updateHeights);
+    return () => window.removeEventListener('resize', updateHeights);
   }, [totalPets, alivePets, deadPets, wallet?.coins]);
 
   // Расчет размеров карусели с учетом всех элементов
@@ -46,21 +54,44 @@ export default function Home() {
       const viewportHeight = window.innerHeight;
       const isIPadPro = width >= 1024 && width < 1280 && viewportHeight > 1000;
       
-      // Учитываем только safe-area-inset-bottom для Dock (safe-area-inset-top учитывается только в Header)
-      const safeAreaBottom = typeof window !== 'undefined' 
-        ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) 
-        : 0;
+      // Получаем Telegram content safe area insets (для учета UI элементов Telegram)
+      // Используем Telegram WebApp API, если доступно, иначе fallback на стандартные safe area
+      let tgContentSafeAreaTop = 0;
+      let tgContentSafeAreaBottom = 0;
+      
+      if (typeof window !== 'undefined') {
+        // Пытаемся получить из Telegram WebApp API
+        const tgWebApp = (window as any).Telegram?.WebApp;
+        if (tgWebApp?.contentSafeAreaInset) {
+          tgContentSafeAreaTop = tgWebApp.contentSafeAreaInset.top || 0;
+          tgContentSafeAreaBottom = tgWebApp.contentSafeAreaInset.bottom || 0;
+        } else {
+          // Fallback: пытаемся получить из CSS переменных или стандартных safe area
+          const rootStyle = getComputedStyle(document.documentElement);
+          tgContentSafeAreaTop = parseInt(
+            rootStyle.getPropertyValue('--tg-content-safe-area-inset-top') || 
+            rootStyle.getPropertyValue('env(safe-area-inset-top)') || '0', 
+            10
+          );
+          tgContentSafeAreaBottom = parseInt(
+            rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom') || 
+            rootStyle.getPropertyValue('env(safe-area-inset-bottom)') || '0', 
+            10
+          );
+        }
+      }
       
       // Высота Dock (адаптивная)
       const dockHeightValue = width < 640 ? 60 : 72;
       const dockBottomOffset = width < 640 ? 8 : 16;
-      const totalDockHeight = dockHeightValue + dockBottomOffset + safeAreaBottom;
+      const totalDockHeight = dockHeightValue + dockBottomOffset + tgContentSafeAreaBottom;
       
       // Сохраняем высоту дока для использования в стилях
       setDockHeight(totalDockHeight);
       
-      // Высота Header (примерно 3.5rem = 56px на мобильных, больше на планшетах)
-      const headerHeight = width < 640 ? 56 : width < 1024 ? 60 : 64;
+      // Используем измеренную высоту Header (уже включает Telegram content safe area)
+      // Если еще не измерена, используем примерное значение
+      const effectiveHeaderHeight = headerHeight || (width < 640 ? 56 : width < 1024 ? 60 : 64);
       
       // Отступы
       const paddingX = width < 640 ? 16 : 24;
@@ -73,7 +104,7 @@ export default function Home() {
       const indicatorsHeight = 24;
       
       // Доступная высота для карусели (учитываем Header, QuickStats, Dock и индикаторы)
-      const availableHeight = viewportHeight - headerHeight - topSectionHeight - totalDockHeight - indicatorsHeight;
+      const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight;
       
       if (width < 640) {
         // Мобильные устройства (< 640px)
@@ -109,9 +140,23 @@ export default function Home() {
     };
 
     updateSizes();
+    
+    // Обработка изменения размеров окна
     window.addEventListener('resize', updateSizes);
-    return () => window.removeEventListener('resize', updateSizes);
-  }, [statsHeight]);
+    
+    // Обработка изменения Telegram content safe area (если доступно)
+    const tgWebApp = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
+    if (tgWebApp) {
+      tgWebApp.onEvent('contentSafeAreaChanged', updateSizes);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateSizes);
+      if (tgWebApp) {
+        tgWebApp.offEvent('contentSafeAreaChanged', updateSizes);
+      }
+    };
+  }, [statsHeight, headerHeight]);
 
   // Подготовка данных питомцев с изображениями
   // Мемоизируем с стабильными ссылками на изображения
@@ -203,7 +248,12 @@ export default function Home() {
       {/* Header с кнопкой "Создать питомца" */}
       <Header onCreatePet={() => setIsCreateModalOpen(true)} />
       
-      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" style={{ paddingTop: '3.5rem' }}>
+      <div 
+        className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" 
+        style={{ 
+          paddingTop: `${headerHeight}px`
+        }}
+      >
         {/* Верхняя секция: быстрые статусы */}
         <div 
           ref={statsRef}
