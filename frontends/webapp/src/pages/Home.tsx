@@ -27,7 +27,12 @@ export default function Home() {
   const [dockHeight, setDockHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(56); // Начальная высота Header
   const [tgContentSafeAreaBottom, setTgContentSafeAreaBottom] = useState(0); // Telegram content safe area снизу
-  const [containerPaddingX, setContainerPaddingX] = useState(6); // Отступы контейнера (адаптивные)
+  // Инициализируем отступы на основе текущей ширины экрана (работает и в браузере, и в Telegram)
+  const getInitialPadding = () => {
+    if (typeof window === 'undefined') return 6;
+    return window.innerWidth < 640 ? 6 : 8;
+  };
+  const [containerPaddingX, setContainerPaddingX] = useState(getInitialPadding()); // Отступы контейнера (адаптивные)
 
   // Инициализация Telegram WebApp и получение content safe area
   useEffect(() => {
@@ -179,11 +184,16 @@ export default function Home() {
   }, [totalPets, alivePets, deadPets, wallet?.coins]);
 
   // Расчет размеров карусели с учетом всех элементов
+  // Этот эффект работает одинаково и в браузере, и в Telegram
   useLayoutEffect(() => {
     const updateSizes = () => {
       const width = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const isIPadPro = width >= 1024 && width < 1280 && viewportHeight > 1000;
+      
+      // Сразу устанавливаем отступы (работает и в браузере, и в Telegram)
+      const containerPaddingXValue = width < 640 ? 6 : 8; // Было 16/24, стало 6/8
+      setContainerPaddingX(containerPaddingXValue);
       
       // Получаем Telegram content safe area insets (для учета UI элементов Telegram)
       // Используем Telegram WebApp API, если доступно, иначе fallback на стандартные safe area
@@ -242,10 +252,6 @@ export default function Home() {
       // Если еще не измерена, используем примерное значение
       const effectiveHeaderHeight = headerHeight || (width < 640 ? 56 : width < 1024 ? 60 : 64);
       
-      // Отступы (уменьшены примерно в 3 раза для карусели)
-      // Для контейнера используем минимальные отступы
-      const containerPaddingXValue = width < 640 ? 6 : 8; // Было 16/24, стало 6/8
-      setContainerPaddingX(containerPaddingXValue);
       // Для карусели используем еще меньшие отступы (внутренний padding карусели убран)
       const carouselPaddingX = 0; // Убираем внутренний padding карусели
       const gapBetweenSections = width < 640 ? 6 : width < 1024 ? 8 : 12;
@@ -313,7 +319,7 @@ export default function Home() {
         tgWebApp.offEvent('contentSafeAreaChanged', updateSizes);
       }
     };
-  }, [statsHeight, headerHeight]);
+  }, [statsHeight, headerHeight, tgContentSafeAreaBottom]);
 
   // Подготовка данных питомцев с изображениями
   // Мемоизируем с стабильными ссылками на изображения
