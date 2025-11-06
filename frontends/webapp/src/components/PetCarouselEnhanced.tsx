@@ -439,13 +439,15 @@ export default function PetCarouselEnhanced({
       const viewportHeight = window.innerHeight;
       const isIPadPro = viewportWidth >= 1024 && viewportWidth < 1280 && viewportHeight > 1000;
       
-      // Учитываем safe-area-insets для Telegram WebApp
-      const safeAreaTop = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) : 0;
+      // Учитываем только safe-area-inset-bottom для Dock (safe-area-inset-top учитывается только в Header)
       const safeAreaBottom = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) : 0;
+      
+      // Высота Header (примерно 56px на мобильных)
+      const headerHeight = viewportWidth < 640 ? 56 : 60;
       
       if (viewportWidth < 640) {
         // Мобильные устройства: оптимизированные размеры для Telegram WebApp
-        const availableHeight = viewportHeight - safeAreaTop - safeAreaBottom - 200; // Вычитаем место для статусов и док-панели
+        const availableHeight = viewportHeight - headerHeight - safeAreaBottom - 200; // Вычитаем место для Header, статусов и док-панели
         setContainerWidth(baseWidth);
         setAdaptiveCardHeight(Math.min(380, availableHeight)); // Адаптивная высота на мобильных
       } else if (viewportWidth >= 640 && viewportWidth < 1024) {

@@ -47,9 +47,8 @@ body {
   background: inherit;
   -webkit-overflow-scrolling: touch;
   overflow-x: hidden;
-  /* Safe area padding для body - UI элементы не будут в safe area */
+  /* Safe area padding убран - учитывается только в Header */
   /* Не добавляем padding-bottom, так как Dock сам учитывает safe-area-inset-bottom */
-  padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
   padding-left: env(safe-area-inset-left);
 }

@@ -46,10 +46,7 @@ export default function Home() {
       const viewportHeight = window.innerHeight;
       const isIPadPro = width >= 1024 && width < 1280 && viewportHeight > 1000;
       
-      // Учитываем safe-area-insets для Telegram WebApp
-      const safeAreaTop = typeof window !== 'undefined' 
-        ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) 
-        : 0;
+      // Учитываем только safe-area-inset-bottom для Dock (safe-area-inset-top учитывается только в Header)
       const safeAreaBottom = typeof window !== 'undefined' 
         ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) 
         : 0;
@@ -62,8 +59,10 @@ export default function Home() {
       // Сохраняем высоту дока для использования в стилях
       setDockHeight(totalDockHeight);
       
+      // Высота Header (примерно 3.5rem = 56px на мобильных, больше на планшетах)
+      const headerHeight = width < 640 ? 56 : width < 1024 ? 60 : 64;
+      
       // Отступы
-      const paddingTop = safeAreaTop;
       const paddingX = width < 640 ? 16 : 24;
       const gapBetweenSections = width < 640 ? 6 : width < 1024 ? 8 : 12;
       
@@ -73,8 +72,8 @@ export default function Home() {
       // Высота индикаторов карусели (примерно 24px: 8px высота + 8px padding сверху + 8px padding снизу)
       const indicatorsHeight = 24;
       
-      // Доступная высота для карусели (учитываем индикаторы, чтобы они не скрывались за доком)
-      const availableHeight = viewportHeight - paddingTop - topSectionHeight - totalDockHeight - indicatorsHeight;
+      // Доступная высота для карусели (учитываем Header, QuickStats, Dock и индикаторы)
+      const availableHeight = viewportHeight - headerHeight - topSectionHeight - totalDockHeight - indicatorsHeight;
       
       if (width < 640) {
         // Мобильные устройства (< 640px)
@@ -204,7 +203,7 @@ export default function Home() {
       {/* Header с кнопкой "Создать питомца" */}
       <Header onCreatePet={() => setIsCreateModalOpen(true)} />
       
-      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}>
+      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" style={{ paddingTop: '3.5rem' }}>
         {/* Верхняя секция: быстрые статусы */}
         <div 
           ref={statsRef}
