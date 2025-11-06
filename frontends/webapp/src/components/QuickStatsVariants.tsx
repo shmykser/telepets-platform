@@ -71,29 +71,24 @@ function Variant1({ stats, onCreatePet }: QuickStatsVariantsProps) {
   }));
 
   return (
-    <div className="space-y-2 sm:space-y-3">
-      {/* Кнопка "Создать питомца" - выше статусов, по центру, компактная для Telegram WebApp */}
+    <div className="space-y-1.5 sm:space-y-2">
+      {/* Кнопка "Создать питомца" - выше статусов, по центру, адаптивная для всех разрешений */}
       {onCreatePet && (
-        <div className="flex justify-center" style={{ marginTop: '8px', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="flex justify-center">
           <motion.button
             onClick={onCreatePet}
-            className="relative rounded-lg bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-rose-600/90 backdrop-blur-xl border border-white/20 overflow-hidden group"
+            className="relative rounded-lg bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-rose-600/90 backdrop-blur-xl border border-white/20 overflow-hidden group h-7 sm:h-8 md:h-10 w-48 sm:w-56 md:w-64 max-w-[calc(100%-2rem)] sm:max-w-[calc(100%-3rem)]"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.3 }}
             whileHover={{ scale: 1.02, y: -1 }}
             whileTap={{ scale: 0.98 }}
-            style={{
-              height: '25px', // Уменьшено на 30% (было 36px)
-              width: '200px', // Уменьшено на 30% (было 280px)
-              maxWidth: 'calc(100% - 32px)' // Отступы по бокам
-            }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-rose-500/20 group-hover:opacity-30 transition-opacity" />
-            <div className="relative flex items-center justify-center gap-1 px-2 py-0.5 h-full">
-              <Plus className="w-3 h-3 text-white flex-shrink-0" />
-              <span className="text-[10px] font-semibold text-white truncate">Создать питомца</span>
-              <Sparkles className="w-2.5 h-2.5 text-white/80 flex-shrink-0" />
+            <div className="relative flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 md:px-4 py-0.5 sm:py-1 h-full">
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white flex-shrink-0" />
+              <span className="text-xs sm:text-sm md:text-base font-semibold text-white truncate">Создать питомца</span>
+              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white/80 flex-shrink-0" />
             </div>
           </motion.button>
         </div>
@@ -140,7 +135,7 @@ function Variant1({ stats, onCreatePet }: QuickStatsVariantsProps) {
                   {item.value}
                 </motion.div>
                 
-                <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-medium hidden min-[360px]:block">{item.label}</p>
+                <p className="text-[0.625rem] sm:text-[0.6875rem] md:text-xs text-gray-400 font-medium hidden min-[360px]:block">{item.label}</p>
               </div>
 
               <motion.div

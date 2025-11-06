@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useLayoutEffect, useRef } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
 import PetCarousel from '@/components/PetCarousel';
 import QuickStatsVariants from '@/components/QuickStatsVariants';
@@ -15,54 +15,95 @@ export default function Home() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [petName, setPetName] = useState('');
 
+  // Refs для измерения высоты элементов
+  const statsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Адаптивные размеры для карусели
   const [carouselSizes, setCarouselSizes] = useState({ baseWidth: 380, cardHeight: 500 });
+  const [statsHeight, setStatsHeight] = useState(0);
+  const [dockHeight, setDockHeight] = useState(0);
 
-  useEffect(() => {
+  // Измеряем высоту QuickStatsVariants
+  useLayoutEffect(() => {
+    const updateStatsHeight = () => {
+      if (statsRef.current) {
+        const height = statsRef.current.getBoundingClientRect().height;
+        setStatsHeight(height);
+      }
+    };
+
+    updateStatsHeight();
+    window.addEventListener('resize', updateStatsHeight);
+    return () => window.removeEventListener('resize', updateStatsHeight);
+  }, [totalPets, alivePets, deadPets, wallet?.coins]);
+
+  // Расчет размеров карусели с учетом всех элементов
+  useLayoutEffect(() => {
     const updateSizes = () => {
       const width = window.innerWidth;
-      const height = window.innerHeight;
-      const isIPadPro = width >= 1024 && width < 1280 && height > 1000;
+      const viewportHeight = window.innerHeight;
+      const isIPadPro = width >= 1024 && width < 1280 && viewportHeight > 1000;
       
       // Учитываем safe-area-insets для Telegram WebApp
-      const safeAreaTop = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) : 0;
-      const safeAreaBottom = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) : 0;
+      const safeAreaTop = typeof window !== 'undefined' 
+        ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) 
+        : 0;
+      const safeAreaBottom = typeof window !== 'undefined' 
+        ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) 
+        : 0;
+      
+      // Высота Dock (адаптивная)
+      const dockHeightValue = width < 640 ? 60 : 72;
+      const dockBottomOffset = width < 640 ? 8 : 16;
+      const totalDockHeight = dockHeightValue + dockBottomOffset + safeAreaBottom;
+      
+      // Сохраняем высоту дока для использования в стилях
+      setDockHeight(totalDockHeight);
+      
+      // Отступы
+      const paddingTop = safeAreaTop;
+      const paddingX = width < 640 ? 16 : 24;
+      const gapBetweenSections = width < 640 ? 6 : width < 1024 ? 8 : 12;
+      
+      // Высота верхней секции (QuickStats + отступы)
+      const topSectionHeight = statsHeight + gapBetweenSections;
+      
+      // Высота индикаторов карусели (примерно 24px: 8px высота + 8px padding сверху + 8px padding снизу)
+      const indicatorsHeight = 24;
+      
+      // Доступная высота для карусели (учитываем индикаторы, чтобы они не скрывались за доком)
+      const availableHeight = viewportHeight - paddingTop - topSectionHeight - totalDockHeight - indicatorsHeight;
       
       if (width < 640) {
-        // Мобильные устройства (< 640px) - оптимизировано для Telegram WebApp
-        const availableHeight = height - safeAreaTop - safeAreaBottom - 140; // Уменьшено с учетом компактных статусов
+        // Мобильные устройства (< 640px)
         setCarouselSizes({ 
-          baseWidth: width - 16, // Уменьшено padding для большего пространства
-          cardHeight: Math.min(360, availableHeight) // Адаптивная высота
+          baseWidth: width - paddingX * 2,
+          cardHeight: Math.max(300, availableHeight) // Минимальная высота 300px
         });
       } else if (width >= 640 && width < 1024) {
         // Планшеты (640px - 1023px)
         setCarouselSizes({ 
-          baseWidth: width - 48, // минус padding sm:px-6
-          cardHeight: 450 
+          baseWidth: width - paddingX * 2,
+          cardHeight: Math.max(400, availableHeight)
         });
       } else if (isIPadPro) {
-        // iPad Pro (1024px ширина, высота > 1000px) - используем максимальную высоту
-        const topSectionHeight = 140; // Уменьшено с учетом компактных статусов
-        const paddingTop = 16; // paddingTop
-        const paddingBottom = 80; // paddingBottom + dock
-        const gap = 24; // отступы между секциями
-        const maxCardHeight = height - topSectionHeight - paddingTop - paddingBottom - gap;
+        // iPad Pro (1024px ширина, высота > 1000px)
         setCarouselSizes({ 
-          baseWidth: Math.min(700, width - 96), // Широкая карточка, но с отступами
-          cardHeight: Math.max(600, maxCardHeight) // Используем максимальную доступную высоту
+          baseWidth: Math.min(700, width - paddingX * 2),
+          cardHeight: Math.max(500, availableHeight)
         });
       } else if (width >= 1024 && width < 1280) {
         // Небольшие десктопы (1024px - 1279px, но не iPad Pro)
         setCarouselSizes({ 
-          baseWidth: 420, 
-          cardHeight: 420 
+          baseWidth: 420,
+          cardHeight: Math.max(400, availableHeight)
         });
       } else {
         // Большие десктопы (>= 1280px)
         setCarouselSizes({ 
-          baseWidth: 480, 
-          cardHeight: 500 
+          baseWidth: 480,
+          cardHeight: Math.max(450, availableHeight)
         });
       }
     };
@@ -70,7 +111,7 @@ export default function Home() {
     updateSizes();
     window.addEventListener('resize', updateSizes);
     return () => window.removeEventListener('resize', updateSizes);
-  }, []);
+  }, [statsHeight]);
 
   // Подготовка данных питомцев с изображениями
   // Мемоизируем с стабильными ссылками на изображения
@@ -131,7 +172,7 @@ export default function Home() {
   // Состояние загрузки
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] flex items-center justify-center px-4">
+      <div className="h-dvh bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] flex items-center justify-center px-4 overflow-hidden">
         <div className="text-white text-xl">Загрузка...</div>
       </div>
     );
@@ -140,7 +181,7 @@ export default function Home() {
   // Пустое состояние
   if (!totalPets || transformedPets.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] flex items-center justify-center px-4">
+      <div className="h-dvh bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] flex items-center justify-center px-4 overflow-hidden">
         <div className="text-center text-white">
           <h2 className="text-2xl font-bold mb-2">Нет питомцев</h2>
           <p className="text-gray-400">Создайте своего первого питомца</p>
@@ -151,15 +192,20 @@ export default function Home() {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] px-4 sm:px-6 overflow-x-hidden flex flex-col"
+      ref={containerRef}
+      className="h-dvh bg-gradient-to-br from-[#0a0a0a] via-[#1a0a1a] to-[#0a1a1a] overflow-hidden flex flex-col"
       style={{ 
-        minHeight: '-webkit-fill-available',
-        maxWidth: '100vw' 
+        maxWidth: '100vw',
+        height: '100dvh', // Fallback для браузеров без поддержки dvh
+        minHeight: '-webkit-fill-available' // Fallback для Safari
       }}
     >
-      <div className="max-w-7xl mx-auto w-full overflow-x-hidden flex flex-col flex-1">
+      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         {/* Верхняя секция: быстрые статусы и кнопка создания */}
-        <div className="mb-3 sm:mb-4 md:mb-6" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div 
+          ref={statsRef}
+          className="flex-shrink-0 mb-1.5 sm:mb-2 md:mb-3"
+        >
           <QuickStatsVariants
             stats={{
               totalPets: totalPets || 0,
@@ -172,8 +218,13 @@ export default function Home() {
           />
         </div>
 
-        {/* Карусель питомцев */}
-        <div className="w-full flex-1 flex items-center justify-center min-h-0">
+        {/* Карусель питомцев - занимает все доступное пространство */}
+        <div 
+          className="flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+          style={{ 
+            paddingBottom: `${dockHeight}px` 
+          }}
+        >
           <PetCarousel
             pets={transformedPets}
             onPetSelect={handlePetSelect}
@@ -189,7 +240,7 @@ export default function Home() {
             pauseOnHover={true}
             loop={false}
             showIndicators={true}
-            className="w-full"
+            className="w-full h-full"
           />
         </div>
       </div>

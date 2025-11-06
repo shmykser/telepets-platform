@@ -515,30 +515,33 @@ export default function PetCarousel({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden p-4 ${className}`}
+      className={`relative overflow-hidden flex flex-col ${className}`}
       style={{
         width: `${baseWidth}px`,
-        maxWidth: '100%'
+        maxWidth: '100%',
+        height: '100%',
+        padding: '0 16px'
       }}
     >
       {/* ЛОГИКА ИЗ CAROUSEL.TSX - НЕ МЕНЯТЬ! */}
-      <motion.div
-        className="flex"
-        drag="x"
-        {...dragProps}
-        style={{
-          width: itemWidth,
-          gap: `${GAP}px`,
-          perspective: 1000,
-          perspectiveOrigin: `${currentIndex * trackItemOffset + itemWidth / 2}px 50%`,
-          transformStyle: 'preserve-3d',
-          x
-        }}
-        onDragEnd={handleDragEnd}
-        animate={{ x: -(currentIndex * trackItemOffset) }}
-        transition={effectiveTransition}
-        onAnimationComplete={handleAnimationComplete}
-      >
+      <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+        <motion.div
+          className="flex"
+          drag="x"
+          {...dragProps}
+          style={{
+            width: itemWidth,
+            gap: `${GAP}px`,
+            perspective: 1000,
+            perspectiveOrigin: `${currentIndex * trackItemOffset + itemWidth / 2}px 50%`,
+            transformStyle: 'preserve-3d',
+            x
+          }}
+          onDragEnd={handleDragEnd}
+          animate={{ x: -(currentIndex * trackItemOffset) }}
+          transition={effectiveTransition}
+          onAnimationComplete={handleAnimationComplete}
+        >
         {carouselItems.map((pet, index) => (
           <PetCard
             key={pet.id ?? pet.name ?? index}
@@ -560,11 +563,12 @@ export default function PetCarousel({
             effectiveTransition={effectiveTransition}
           />
         ))}
-      </motion.div>
+        </motion.div>
+      </div>
       
       {showIndicators && pets.length > 1 && (
-        <div className="flex w-full justify-center">
-          <div className="mt-4 flex w-[150px] justify-between px-8">
+        <div className="flex-shrink-0 flex w-full justify-center py-2">
+          <div className="flex w-[150px] justify-between px-8">
             {pets.map((_, index) => (
               <motion.div
                 key={index}
