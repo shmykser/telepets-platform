@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
-import PetCarouselEnhanced from '@/components/PetCarouselEnhanced';
+import PetCarousel from '@/components/PetCarousel';
 import QuickStatsVariants from '@/components/QuickStatsVariants';
 import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
 import DialogEnhanced from '@/components/DialogEnhanced';
@@ -174,7 +174,7 @@ export default function Home() {
 
         {/* Карусель питомцев */}
         <div className="w-full flex-1 flex items-center justify-center min-h-0">
-          <PetCarouselEnhanced
+          <PetCarousel
             pets={transformedPets}
             onPetSelect={handlePetSelect}
             onHealthUp={handleHealthUp}
@@ -187,6 +187,7 @@ export default function Home() {
             cardHeight={carouselSizes?.cardHeight ?? 500}
             autoplay={false}
             pauseOnHover={true}
+            loop={false}
             showIndicators={true}
             className="w-full"
           />
