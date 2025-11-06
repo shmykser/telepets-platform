@@ -36,7 +36,7 @@ class WalletHold(Base):
     user_id = Column(String, ForeignKey('users.user_id'), nullable=False, index=True)
     auction_id = Column(Integer, ForeignKey('auctions.id'), nullable=False, index=True)
     amount = Column(Integer, nullable=False)
-    status = Column(Enum(WalletHoldStatus), nullable=False, default=WalletHoldStatus.active)
+    status = Column(Enum(WalletHoldStatus, name='wallet_hold_status'), nullable=False, default=WalletHoldStatus.active)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     released_at = Column(DateTime(timezone=True), nullable=True)
     captured_at = Column(DateTime(timezone=True), nullable=True)

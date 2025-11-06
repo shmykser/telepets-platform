@@ -10,7 +10,7 @@ class Pet(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
     name = Column(String, nullable=False)
-    state = Column(Enum(PetState), default=PetState.egg, nullable=False)
+    state = Column(Enum(PetState, name='pet_state'), default=PetState.egg, nullable=False)
     status = Column(Enum(PetLifeStatus, name='pet_life_status'), default=PetLifeStatus.alive, nullable=False)
     health = Column(Integer, default=HEALTH_MAX, nullable=False)
     creature_json = Column(Text, nullable=True)
