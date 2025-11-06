@@ -103,8 +103,12 @@ export default function Home() {
       // Высота индикаторов карусели (примерно 24px: 8px высота + 8px padding сверху + 8px padding снизу)
       const indicatorsHeight = 24;
       
-      // Доступная высота для карусели (учитываем Header, QuickStats, Dock и индикаторы)
-      const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight;
+      // Дополнительный отступ снизу для Telegram content safe area (чтобы карусель не заезжала на Dock)
+      // Этот отступ нужен только в Telegram WebApp, в обычном браузере tgContentSafeAreaBottom будет 0
+      const additionalBottomPadding = tgContentSafeAreaBottom > 0 ? tgContentSafeAreaBottom : 0;
+      
+      // Доступная высота для карусели (учитываем Header, QuickStats, Dock, индикаторы и Telegram content safe area)
+      const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight - additionalBottomPadding;
       
       if (width < 640) {
         // Мобильные устройства (< 640px)
@@ -274,7 +278,7 @@ export default function Home() {
         <div 
           className="flex-1 flex items-center justify-center min-h-0 overflow-hidden"
           style={{ 
-            paddingBottom: `${dockHeight}px` 
+            paddingBottom: `calc(${dockHeight}px + var(--tg-content-safe-area-inset-bottom, 0px))`
           }}
         >
           <PetCarousel
