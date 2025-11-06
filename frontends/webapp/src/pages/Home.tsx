@@ -1,4 +1,4 @@
-import { useMemo, useState, useLayoutEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
 import PetCarousel from '@/components/PetCarousel';
 import QuickStatsVariants from '@/components/QuickStatsVariants';
@@ -25,6 +25,50 @@ export default function Home() {
   const [statsHeight, setStatsHeight] = useState(0);
   const [dockHeight, setDockHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(56); // Начальная высота Header
+  const [tgContentSafeAreaBottom, setTgContentSafeAreaBottom] = useState(0); // Telegram content safe area снизу
+
+  // Инициализация Telegram WebApp и получение content safe area
+  useEffect(() => {
+    const initTelegramSafeArea = () => {
+      if (typeof window === 'undefined') return;
+      
+      const tgWebApp = (window as any).Telegram?.WebApp;
+      if (tgWebApp) {
+        // Получаем content safe area из Telegram WebApp API
+        if (tgWebApp.contentSafeAreaInset) {
+          setTgContentSafeAreaBottom(tgWebApp.contentSafeAreaInset.bottom || 0);
+        }
+        
+        // Подписываемся на изменения content safe area
+        const handleContentSafeAreaChanged = () => {
+          if (tgWebApp.contentSafeAreaInset) {
+            setTgContentSafeAreaBottom(tgWebApp.contentSafeAreaInset.bottom || 0);
+          }
+        };
+        
+        tgWebApp.onEvent('contentSafeAreaChanged', handleContentSafeAreaChanged);
+        
+        return () => {
+          tgWebApp.offEvent('contentSafeAreaChanged', handleContentSafeAreaChanged);
+        };
+      } else {
+        // Если Telegram WebApp API еще не загружен, пытаемся получить из CSS переменных
+        const rootStyle = getComputedStyle(document.documentElement);
+        const tgContentBottom = rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom').trim();
+        if (tgContentBottom) {
+          setTgContentSafeAreaBottom(parseInt(tgContentBottom, 10) || 0);
+        }
+      }
+    };
+
+    // Пытаемся инициализировать сразу
+    initTelegramSafeArea();
+    
+    // Также пытаемся инициализировать после небольшой задержки (на случай, если API еще не загружен)
+    const timeoutId = setTimeout(initTelegramSafeArea, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // Измеряем высоту QuickStatsVariants и Header
   useLayoutEffect(() => {
@@ -57,34 +101,52 @@ export default function Home() {
       // Получаем Telegram content safe area insets (для учета UI элементов Telegram)
       // Используем Telegram WebApp API, если доступно, иначе fallback на стандартные safe area
       let tgContentSafeAreaTop = 0;
-      let tgContentSafeAreaBottom = 0;
+      let tgContentSafeAreaBottomValue = 0;
       
       if (typeof window !== 'undefined') {
         // Пытаемся получить из Telegram WebApp API
         const tgWebApp = (window as any).Telegram?.WebApp;
         if (tgWebApp?.contentSafeAreaInset) {
+          // Используем Telegram WebApp API (приоритетный способ)
           tgContentSafeAreaTop = tgWebApp.contentSafeAreaInset.top || 0;
-          tgContentSafeAreaBottom = tgWebApp.contentSafeAreaInset.bottom || 0;
+          tgContentSafeAreaBottomValue = tgWebApp.contentSafeAreaInset.bottom || 0;
         } else {
-          // Fallback: пытаемся получить из CSS переменных или стандартных safe area
+          // Fallback: пытаемся получить из CSS переменных, которые Telegram устанавливает
           const rootStyle = getComputedStyle(document.documentElement);
-          tgContentSafeAreaTop = parseInt(
-            rootStyle.getPropertyValue('--tg-content-safe-area-inset-top') || 
-            rootStyle.getPropertyValue('env(safe-area-inset-top)') || '0', 
-            10
-          );
-          tgContentSafeAreaBottom = parseInt(
-            rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom') || 
-            rootStyle.getPropertyValue('env(safe-area-inset-bottom)') || '0', 
-            10
-          );
+          
+          // Пытаемся получить Telegram content safe area из CSS переменных
+          const tgContentTop = rootStyle.getPropertyValue('--tg-content-safe-area-inset-top').trim();
+          const tgContentBottom = rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom').trim();
+          
+          if (tgContentTop) {
+            tgContentSafeAreaTop = parseInt(tgContentTop, 10) || 0;
+          } else {
+            // Если Telegram переменных нет, используем стандартные safe area
+            tgContentSafeAreaTop = parseInt(
+              rootStyle.getPropertyValue('env(safe-area-inset-top)') || '0', 
+              10
+            );
+          }
+          
+          if (tgContentBottom) {
+            tgContentSafeAreaBottomValue = parseInt(tgContentBottom, 10) || 0;
+          } else {
+            // Если Telegram переменных нет, используем стандартные safe area
+            tgContentSafeAreaBottomValue = parseInt(
+              rootStyle.getPropertyValue('env(safe-area-inset-bottom)') || '0', 
+              10
+            );
+          }
         }
       }
       
-      // Высота Dock (адаптивная)
+      // Сохраняем Telegram content safe area bottom для использования в стилях
+      setTgContentSafeAreaBottom(tgContentSafeAreaBottomValue);
+      
+      // Высота Dock (адаптивная) - НЕ включаем tgContentSafeAreaBottom, так как Dock сам учитывает его в позиционировании
       const dockHeightValue = width < 640 ? 60 : 72;
       const dockBottomOffset = width < 640 ? 8 : 16;
-      const totalDockHeight = dockHeightValue + dockBottomOffset + tgContentSafeAreaBottom;
+      const totalDockHeight = dockHeightValue + dockBottomOffset;
       
       // Сохраняем высоту дока для использования в стилях
       setDockHeight(totalDockHeight);
@@ -103,12 +165,9 @@ export default function Home() {
       // Высота индикаторов карусели (примерно 24px: 8px высота + 8px padding сверху + 8px padding снизу)
       const indicatorsHeight = 24;
       
-      // Дополнительный отступ снизу для Telegram content safe area (чтобы карусель не заезжала на Dock)
-      // Этот отступ нужен только в Telegram WebApp, в обычном браузере tgContentSafeAreaBottom будет 0
-      const additionalBottomPadding = tgContentSafeAreaBottom > 0 ? tgContentSafeAreaBottom : 0;
-      
-      // Доступная высота для карусели (учитываем Header, QuickStats, Dock, индикаторы и Telegram content safe area)
-      const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight - additionalBottomPadding;
+      // Доступная высота для карусели (учитываем Header, QuickStats, Dock, индикаторы и Telegram content safe area снизу)
+      // Telegram content safe area снизу будет учтен в paddingBottom контейнера карусели
+      const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight - tgContentSafeAreaBottomValue;
       
       if (width < 640) {
         // Мобильные устройства (< 640px)
@@ -278,7 +337,7 @@ export default function Home() {
         <div 
           className="flex-1 flex items-center justify-center min-h-0 overflow-hidden"
           style={{ 
-            paddingBottom: `calc(${dockHeight}px + var(--tg-content-safe-area-inset-bottom, 0px))`
+            paddingBottom: `${dockHeight + tgContentSafeAreaBottom}px`
           }}
         >
           <PetCarousel
