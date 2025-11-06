@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { Heart, Coins, PawPrint, Skull, Plus, Sparkles } from 'lucide-react';
 
 export interface QuickStatsVariantsProps {
@@ -63,121 +63,68 @@ const statItems: StatItem[] = [
   }
 ];
 
-// Tooltip component для карточек статистики
-function StatTooltip({ 
-  label, 
-  isVisible, 
-  onClose 
-}: { 
-  label: string; 
-  isVisible: boolean; 
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (isVisible) {
-      // Определяем, мобильное ли устройство (touch events)
-      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      
-      if (isMobile) {
-        const timer = setTimeout(() => {
-          onClose();
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [isVisible, onClose]);
-
-  return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: 0, scale: 0.8 }}
-          animate={{ opacity: 1, y: -8, scale: 1 }}
-          exit={{ opacity: 0, y: 0, scale: 0.8 }}
-          transition={{ 
-            type: 'spring',
-            stiffness: 300,
-            damping: 25
-          }}
-          className="absolute -top-10 left-1/2 w-fit whitespace-nowrap rounded-lg border border-white/20 bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl px-3 py-1.5 text-xs text-white shadow-2xl z-50"
-          style={{ transform: 'translateX(-50%)' }}
-          role="tooltip"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg blur-sm -z-10" />
-          <div className="text-gray-200 font-medium">{label}</div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// Variant 1: Компактный glassmorphism
+// Variant 1: Компактный glassmorphism (адаптирован для Telegram WebApp)
 function Variant1({ stats, onCreatePet }: QuickStatsVariantsProps) {
   const items = statItems.map(item => ({
     ...item,
     value: stats[item.key as keyof typeof stats] ?? 0
   }));
 
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+    <div className="space-y-2 sm:space-y-3">
+      {/* Кнопка "Создать питомца" - выше статусов, по центру, компактная для Telegram WebApp */}
+      {onCreatePet && (
+        <div className="flex justify-center" style={{ marginTop: '8px', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <motion.button
+            onClick={onCreatePet}
+            className="relative rounded-lg bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-rose-600/90 backdrop-blur-xl border border-white/20 overflow-hidden group"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              height: '25px', // Уменьшено на 30% (было 36px)
+              width: '200px', // Уменьшено на 30% (было 280px)
+              maxWidth: 'calc(100% - 32px)' // Отступы по бокам
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-rose-500/20 group-hover:opacity-30 transition-opacity" />
+            <div className="relative flex items-center justify-center gap-1 px-2 py-0.5 h-full">
+              <Plus className="w-3 h-3 text-white flex-shrink-0" />
+              <span className="text-[10px] font-semibold text-white truncate">Создать питомца</span>
+              <Sparkles className="w-2.5 h-2.5 text-white/80 flex-shrink-0" />
+            </div>
+          </motion.button>
+        </div>
+      )}
+
+      {/* Статусы - адаптированы под мобильные */}
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:gap-3">
         {items.map((item, index) => {
           const Icon = item.icon;
-          const isTooltipVisible = activeTooltip === item.key;
-
-          const handleMouseEnter = () => {
-            setActiveTooltip(item.key);
-          };
-
-          const handleMouseLeave = () => {
-            setActiveTooltip(null);
-          };
-
-          const handleTouchStart = () => {
-            setActiveTooltip(item.key);
-          };
-
-          const handleClick = () => {
-            // На мобильных показываем tooltip при клике
-            const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-            if (isMobile) {
-              setActiveTooltip(item.key);
-            }
-          };
 
           return (
             <motion.div
               key={item.key}
-              className="relative rounded-lg sm:rounded-xl bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90 backdrop-blur-xl border border-white/10 overflow-visible group cursor-pointer"
+              className="relative rounded-lg sm:rounded-xl bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90 backdrop-blur-xl border border-white/10 overflow-hidden group cursor-pointer"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1, duration: 0.5 }}
+              transition={{ delay: index * 0.1 + 0.2, duration: 0.5 }}
               whileHover={{ scale: 1.05, y: -5 }}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onTouchStart={handleTouchStart}
-              onClick={handleClick}
+              whileTap={{ scale: 0.95 }}
             >
-              {/* Tooltip */}
-              <StatTooltip
-                label={item.label}
-                isVisible={isTooltipVisible}
-                onClose={() => setActiveTooltip(null)}
-              />
-
               <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-10 group-hover:opacity-20 transition-opacity rounded-lg sm:rounded-xl`} />
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none rounded-lg sm:rounded-xl" />
               
-              <div className="relative p-2 sm:p-3 text-center">
+              <div className="relative p-1.5 sm:p-2 md:p-3 text-center">
                 <motion.div
-                  className={`inline-flex p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br ${item.color} bg-opacity-30 mb-1.5 sm:mb-2 relative`}
+                  className={`inline-flex p-1 sm:p-1.5 md:p-2 rounded-md sm:rounded-lg bg-gradient-to-br ${item.color} bg-opacity-30 mb-1 sm:mb-1.5 md:mb-2 relative`}
                   whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                   transition={{ duration: 0.5 }}
                 >
                   <Icon 
-                    className={`w-4 h-4 sm:w-5 sm:h-5 ${item.iconColor} drop-shadow-lg`} 
+                    className={`w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 ${item.iconColor} drop-shadow-lg`} 
                     strokeWidth={2.5}
                   />
                   {/* Subtle glow effect */}
@@ -185,15 +132,15 @@ function Variant1({ stats, onCreatePet }: QuickStatsVariantsProps) {
                 </motion.div>
                 
                 <motion.div
-                  className="text-sm sm:text-base font-black text-white mb-0.5 sm:mb-1"
+                  className="text-xs sm:text-sm md:text-base font-black text-white mb-0.5 sm:mb-1 relative z-20"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ delay: index * 0.1 + 0.2, type: 'spring', stiffness: 200 }}
+                  transition={{ delay: index * 0.1 + 0.4, type: 'spring', stiffness: 200 }}
                 >
                   {item.value}
                 </motion.div>
                 
-                <p className="text-[10px] sm:text-xs text-gray-400 font-medium hidden sm:block">{item.label}</p>
+                <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-medium hidden min-[360px]:block">{item.label}</p>
               </div>
 
               <motion.div
@@ -204,25 +151,6 @@ function Variant1({ stats, onCreatePet }: QuickStatsVariantsProps) {
           );
         })}
       </div>
-
-      {onCreatePet && (
-        <motion.button
-          onClick={onCreatePet}
-          className="w-full relative rounded-xl bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-rose-600/90 backdrop-blur-xl border border-white/20 overflow-hidden group"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-rose-500/20 group-hover:opacity-30 transition-opacity" />
-          <div className="relative flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4">
-            <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            <span className="text-sm sm:text-base font-semibold text-white">Создать питомца</span>
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
-          </div>
-        </motion.button>
-      )}
     </div>
   );
 }

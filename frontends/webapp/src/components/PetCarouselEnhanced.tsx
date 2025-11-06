@@ -25,6 +25,7 @@ export interface PetCarouselEnhancedProps {
 const DRAG_BUFFER = 50;
 const VELOCITY_THRESHOLD = 500;
 const GAP = 32;
+const SPRING_OPTIONS = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 // Глобальный кэш для загруженных изображений
 const imageCache = new Set<string>();
@@ -438,15 +439,19 @@ export default function PetCarouselEnhanced({
       const viewportHeight = window.innerHeight;
       const isIPadPro = viewportWidth >= 1024 && viewportWidth < 1280 && viewportHeight > 1000;
       
+      // Учитываем safe-area-insets для Telegram WebApp
+      const safeAreaTop = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) : 0;
+      const safeAreaBottom = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) : 0;
+      
       if (viewportWidth < 640) {
-        // Мобильные устройства: используем переданную baseWidth напрямую
-        // baseWidth уже учитывает отступы главной страницы
+        // Мобильные устройства: оптимизированные размеры для Telegram WebApp
+        const availableHeight = viewportHeight - safeAreaTop - safeAreaBottom - 200; // Вычитаем место для статусов и док-панели
         setContainerWidth(baseWidth);
-        setAdaptiveCardHeight(450); // Меньшая высота на мобильных
+        setAdaptiveCardHeight(Math.min(380, availableHeight)); // Адаптивная высота на мобильных
       } else if (viewportWidth >= 640 && viewportWidth < 1024) {
         // Планшеты (iPad и т.д.): используем переданную baseWidth
         setContainerWidth(baseWidth);
-        setAdaptiveCardHeight(550); // Большая высота на планшетах
+        setAdaptiveCardHeight(500); // Уменьшено с 550 для лучшей адаптации
       } else if (isIPadPro) {
         // iPad Pro: используем переданные размеры (они уже рассчитаны с учетом максимальной высоты)
         setContainerWidth(baseWidth);
@@ -465,8 +470,8 @@ export default function PetCarouselEnhanced({
   
   const viewportWidthForItem = typeof window !== 'undefined' ? window.innerWidth : 0;
   const isTabletForItem = viewportWidthForItem >= 640 && viewportWidthForItem < 1024;
-  // Уменьшаем padding на мобильных для лучшего центрирования
-  const containerPadding = containerWidth < 640 ? 8 : (isTabletForItem ? 20 : 20);
+  // Адаптивный padding с учетом Telegram WebApp
+  const containerPadding = containerWidth < 640 ? 4 : (isTabletForItem ? 16 : 20);
   
   // На всех устройствах используем containerWidth минус padding
   const itemWidth = containerWidth - containerPadding * 2;
@@ -501,40 +506,51 @@ export default function PetCarouselEnhanced({
     }
   }, [pauseOnHover]);
 
-  // Расчет для центрирования (используется в dragConstraints и handleDragEnd)
-  // Центрируем активную карточку в видимой области контейнера для всех размеров экрана
-  const visibleContainerWidth = containerWidth - containerPadding * 2;
-  const centerOffsetForCalc = (visibleContainerWidth / 2) - (itemWidth / 2);
+  // Вычисляем смещение для центрирования первой карточки
+  // visibleWidth - это ширина контейнера без padding
+  // centerOffset - смещение для центрирования карточки в видимой области
+  const visibleWidth = containerWidth;
+  const centerOffset = (visibleWidth - itemWidth) / 2;
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo): void => {
     const offset = info.offset.x;
     const velocity = info.velocity.x;
     const currentX = x.get();
-    // Учитываем центрирование при расчете targetX
-    const targetX = -(currentIndex * trackItemOffset) - centerOffsetForCalc;
-    const draggedDistance = currentX - targetX;
     
-    let targetIndex = currentIndex;
+    // Вычисляем позицию текущего элемента
+    const currentTargetX = -(currentIndex * trackItemOffset) - centerOffset;
+    const distanceFromCurrent = Math.abs(currentX - currentTargetX);
     
-    if (Math.abs(draggedDistance) > DRAG_BUFFER || Math.abs(velocity) > VELOCITY_THRESHOLD) {
-      if (draggedDistance < -DRAG_BUFFER || velocity < -VELOCITY_THRESHOLD) {
-        targetIndex = Math.min(currentIndex + 1, pets.length - 1);
-      } else if (draggedDistance > DRAG_BUFFER || velocity > VELOCITY_THRESHOLD) {
-        targetIndex = Math.max(currentIndex - 1, 0);
-      }
-    } else {
-      // Учитываем центрирование при расчете nearestIndex
-      const adjustedX = currentX + centerOffsetForCalc;
-      const nearestIndex = Math.round(-adjustedX / trackItemOffset);
-      targetIndex = Math.max(0, Math.min(nearestIndex, pets.length - 1));
+    // Если было быстрое движение, переключаем на соседний элемент
+    if (offset < -DRAG_BUFFER || velocity < -VELOCITY_THRESHOLD) {
+      setCurrentIndex(prev => Math.min(prev + 1, pets.length - 1));
+      return;
+    } else if (offset > DRAG_BUFFER || velocity > VELOCITY_THRESHOLD) {
+      setCurrentIndex(prev => Math.max(prev - 1, 0));
+      return;
     }
     
+    // Если движение было медленным, находим ближайший элемент
+    let minDistance = distanceFromCurrent;
+    let targetIndex = currentIndex;
+    
+    for (let i = 0; i < pets.length; i++) {
+      const targetX = -(i * trackItemOffset) - centerOffset;
+      const distance = Math.abs(currentX - targetX);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        targetIndex = i;
+      }
+    }
+    
+    // Всегда центрируемся на ближайшем элементе
     setCurrentIndex(targetIndex);
   };
 
   const dragConstraints = {
-    left: -trackItemOffset * (pets.length - 1) - centerOffsetForCalc,
-    right: -centerOffsetForCalc
+    left: -trackItemOffset * (pets.length - 1) - centerOffset,
+    right: -centerOffset
   };
 
   // Предзагрузка изображений для соседних карточек
@@ -595,9 +611,6 @@ export default function PetCarouselEnhanced({
     return <div className={`text-center text-gray-400 ${className}`}>Нет питомцев</div>;
   }
 
-  // Используем уже вычисленный centerOffsetForCalc для центрирования
-  const adjustedX = x;
-
   return (
     <div
       ref={containerRef}
@@ -620,17 +633,12 @@ export default function PetCarouselEnhanced({
           style={{
             gap: `${GAP}px`,
             transformStyle: 'preserve-3d',
-            x: adjustedX,
+            x: x,
             width: 'max-content'
           }}
           onDragEnd={handleDragEnd}
-          animate={{ x: -(currentIndex * trackItemOffset) - centerOffsetForCalc }}
-          transition={{ 
-            type: 'spring', 
-            stiffness: 400, 
-            damping: 40,
-            restDelta: 0.5
-          }}
+          animate={{ x: -(currentIndex * trackItemOffset) - centerOffset }}
+          transition={SPRING_OPTIONS}
         >
           {pets.map((pet, index) => (
             <PetCard 

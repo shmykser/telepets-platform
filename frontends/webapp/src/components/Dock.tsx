@@ -231,12 +231,12 @@ export default function Dock({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
-  // Динамические размеры в зависимости от ширины экрана
-  const adaptiveBaseItemSize = screenWidth < 360 ? 44 : isMobile ? 48 : baseItemSize;
-  const adaptivePanelHeight = screenWidth < 360 ? 60 : isMobile ? 64 : panelHeight;
-  const adaptiveMagnification = screenWidth < 360 ? 52 : isMobile ? 56 : 64;
-  const adaptiveGap = screenWidth < 360 ? '6px' : isMobile ? '8px' : '12px';
-  const adaptivePaddingX = screenWidth < 360 ? '8px' : isMobile ? '12px' : '20px';
+  // Динамические размеры в зависимости от ширины экрана (оптимизированы для удобства использования)
+  const adaptiveBaseItemSize = screenWidth < 360 ? 40 : isMobile ? 44 : 48; // Оптимальный размер для нажатия
+  const adaptivePanelHeight = screenWidth < 360 ? 52 : isMobile ? 56 : 60; // Высота панели для центрирования
+  const adaptiveMagnification = screenWidth < 360 ? 48 : isMobile ? 52 : 56; // Размер при увеличении
+  const adaptiveGap = screenWidth < 360 ? '6px' : isMobile ? '8px' : '10px'; // Отступы между кнопками
+  const adaptivePaddingX = screenWidth < 360 ? '8px' : isMobile ? '10px' : '16px'; // Горизонтальные отступы
   
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
@@ -253,7 +253,8 @@ export default function Dock({
   );
   
   // Динамический padding-top для подсказки (плавно увеличивается при наведении)
-  const paddingTop = useTransform(isHovered, [0, 1], [8, labelHeight + labelOffset - 2]);
+  // В обычном состоянии paddingTop равен paddingBottom для центрирования
+  const paddingTop = useTransform(isHovered, [0, 1], [6, labelHeight + labelOffset - 2]);
   const paddingTopSpring = useSpring(paddingTop, spring);
   
   const heightRow = useTransform(isHovered, [0, 1], [adaptivePanelHeight, maxHeight]);
@@ -330,7 +331,7 @@ export default function Dock({
         minWidth: 'fit-content',
         paddingLeft: adaptivePaddingX,
         paddingRight: adaptivePaddingX,
-        paddingBottom: '8px',
+        paddingBottom: '6px', // Равный paddingTop для центрирования
         paddingTop: paddingTopSpring,
         background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(31, 41, 55, 0.85) 50%, rgba(17, 24, 39, 0.9) 100%)',
         backdropFilter: 'blur(20px)',
@@ -345,7 +346,7 @@ export default function Dock({
         msOverflowStyle: 'none',
         zIndex: 9999,
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center', // Центрирование по вертикали
         pointerEvents: 'auto',
         willChange: 'transform',
         backfaceVisibility: 'hidden'

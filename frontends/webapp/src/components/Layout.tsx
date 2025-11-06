@@ -10,32 +10,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const dockItems: DockItemData[] = [
     {
-      icon: <Home className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <Home className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'Главная',
       onClick: () => navigate('/')
     },
     {
-      icon: <Store className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <Store className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'Рынок',
       onClick: () => navigate('/market')
     },
     {
-      icon: <Coins className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <Coins className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'Экономика',
       onClick: () => navigate('/economy')
     },
     {
-      icon: <History className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <History className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'История',
       onClick: () => navigate('/history')
     },
     {
-      icon: <User className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <User className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'Админка',
       onClick: () => navigate('/admin')
     },
     {
-      icon: <Settings className="w-5 h-5 sm:w-6 sm:h-6" />,
+      icon: <Settings className="w-4 h-4 sm:w-5 sm:h-5" />,
       label: 'Настройки',
       onClick: () => navigate('/settings')
     }

@@ -24,11 +24,16 @@ export default function Home() {
       const height = window.innerHeight;
       const isIPadPro = width >= 1024 && width < 1280 && height > 1000;
       
+      // Учитываем safe-area-insets для Telegram WebApp
+      const safeAreaTop = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) : 0;
+      const safeAreaBottom = typeof window !== 'undefined' ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) : 0;
+      
       if (width < 640) {
-        // Мобильные устройства (< 640px)
+        // Мобильные устройства (< 640px) - оптимизировано для Telegram WebApp
+        const availableHeight = height - safeAreaTop - safeAreaBottom - 140; // Уменьшено с учетом компактных статусов
         setCarouselSizes({ 
-          baseWidth: width - 32, // минус padding px-4
-          cardHeight: 380 
+          baseWidth: width - 16, // Уменьшено padding для большего пространства
+          cardHeight: Math.min(360, availableHeight) // Адаптивная высота
         });
       } else if (width >= 640 && width < 1024) {
         // Планшеты (640px - 1023px)
@@ -38,7 +43,7 @@ export default function Home() {
         });
       } else if (isIPadPro) {
         // iPad Pro (1024px ширина, высота > 1000px) - используем максимальную высоту
-        const topSectionHeight = 180; // Примерная высота верхней секции (статусы + кнопка)
+        const topSectionHeight = 140; // Уменьшено с учетом компактных статусов
         const paddingTop = 16; // paddingTop
         const paddingBottom = 80; // paddingBottom + dock
         const gap = 24; // отступы между секциями
@@ -154,7 +159,7 @@ export default function Home() {
     >
       <div className="max-w-7xl mx-auto w-full overflow-x-hidden flex flex-col flex-1">
         {/* Верхняя секция: быстрые статусы и кнопка создания */}
-        <div className="mb-4 md:mb-6">
+        <div className="mb-3 sm:mb-4 md:mb-6" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <QuickStatsVariants
             stats={{
               totalPets: totalPets || 0,
