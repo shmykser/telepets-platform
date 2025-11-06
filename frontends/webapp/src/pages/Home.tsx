@@ -6,7 +6,7 @@ import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
 import DialogEnhanced from '@/components/DialogEnhanced';
 import type { Pet } from '@/types';
 import { buildUrl } from '@/config/endpoints';
-import { getStoredUserId } from '@/utils';
+import { getStoredUserId, isTelegramWebApp, getTelegramHeaderHeight } from '@/utils';
 
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
@@ -53,6 +53,9 @@ export default function Home() {
         ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)') || '0', 10) 
         : 0;
       
+      // Высота header Telegram WebApp (если открыто в Telegram)
+      const telegramHeaderHeight = isTelegramWebApp() ? getTelegramHeaderHeight() : 0;
+      
       // Высота Dock (адаптивная)
       const dockHeightValue = width < 640 ? 60 : 72;
       const dockBottomOffset = width < 640 ? 8 : 16;
@@ -61,8 +64,8 @@ export default function Home() {
       // Сохраняем высоту дока для использования в стилях
       setDockHeight(totalDockHeight);
       
-      // Отступы
-      const paddingTop = safeAreaTop;
+      // Отступы: safe-area-top + высота header Telegram (если в Telegram WebApp)
+      const paddingTop = safeAreaTop + telegramHeaderHeight;
       const paddingX = width < 640 ? 16 : 24;
       const gapBetweenSections = width < 640 ? 6 : width < 1024 ? 8 : 12;
       
@@ -200,7 +203,14 @@ export default function Home() {
         minHeight: '-webkit-fill-available' // Fallback для Safari
       }}
     >
-      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div 
+        className="flex-1 flex flex-col px-4 sm:px-6" 
+        style={{ 
+          paddingTop: `calc(env(safe-area-inset-top, 0px) + ${isTelegramWebApp() ? getTelegramHeaderHeight() : 0}px)`,
+          overflowX: 'hidden',
+          overflowY: 'visible'
+        }}
+      >
         {/* Верхняя секция: быстрые статусы и кнопка создания */}
         <div 
           ref={statsRef}
@@ -220,9 +230,11 @@ export default function Home() {
 
         {/* Карусель питомцев - занимает все доступное пространство */}
         <div 
-          className="flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+          className="flex-1 flex items-center justify-center min-h-0"
           style={{ 
-            paddingBottom: `${dockHeight}px` 
+            paddingBottom: `${dockHeight}px`,
+            overflowY: 'visible',
+            overflowX: 'hidden'
           }}
         >
           <PetCarousel

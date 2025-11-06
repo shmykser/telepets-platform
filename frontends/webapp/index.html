@@ -8,6 +8,41 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Telepets - Новый интерфейс</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      // Инициализация Telegram WebApp
+      (function(){
+        try {
+          if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            // Устанавливаем цвета для Telegram WebApp
+            try {
+              if (typeof tg.setHeaderColor === 'function') {
+                tg.setHeaderColor('#0a0a0a');
+              }
+              if (typeof tg.setBackgroundColor === 'function') {
+                tg.setBackgroundColor('#0a0a0a');
+              }
+            } catch {}
+            // Сохраняем user_id если доступен
+            try {
+              const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user;
+              if (tgUser && tgUser.id) {
+                localStorage.setItem('user_id', String(tgUser.id));
+                if (tgUser.username) {
+                  localStorage.setItem('username', tgUser.username);
+                }
+              }
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('Telegram WebApp not available:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
