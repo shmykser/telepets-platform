@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.tsx'
 import './index.css'
 import { setStoredUserId, setStoredUsername } from './utils'
+import { initTelegramWebApp } from './utils/telegram'
 
 if (!localStorage.getItem('user_id')) {
   setStoredUserId('273065571');
@@ -12,6 +13,16 @@ if (!localStorage.getItem('user_id')) {
 if (!localStorage.getItem('username')) {
   setStoredUsername('Shmykser');
 }
+
+// Инициализация Telegram WebApp
+// Устанавливаем цвет заголовка в цвет фона, чтобы кнопка "Закрыть" была менее заметной
+// Кнопку "Закрыть" нельзя скрыть или переименовать - это системная кнопка Telegram
+initTelegramWebApp({
+  headerColor: '#0a0a0a', // Темный цвет, совпадающий с фоном
+  backgroundColor: '#0a0a0a',
+  enableClosingConfirmation: false, // Можно включить, если нужно подтверждение при закрытии
+  hideHeader: true, // Делаем заголовок менее заметным, устанавливая его цвет в цвет фона
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
