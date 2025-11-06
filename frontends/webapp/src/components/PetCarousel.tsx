@@ -515,12 +515,15 @@ export default function PetCarousel({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden flex flex-col ${className}`}
+      data-carousel="true"
+      className={`relative overflow-hidden flex flex-col carousel-container ${className}`}
       style={{
         width: `${baseWidth}px`,
         maxWidth: '100%',
         height: '100%',
-        padding: '0 16px'
+        padding: '0 16px',
+        // Разрешаем горизонтальные свайпы для карусели
+        touchAction: 'pan-x pinch-zoom'
       }}
     >
       {/* ЛОГИКА ИЗ CAROUSEL.TSX - НЕ МЕНЯТЬ! */}

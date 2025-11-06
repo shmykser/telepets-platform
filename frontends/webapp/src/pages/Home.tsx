@@ -8,6 +8,7 @@ import Header from '@/components/Header';
 import type { Pet } from '@/types';
 import { buildUrl } from '@/config/endpoints';
 import { getStoredUserId } from '@/utils';
+import { isTelegramWebApp } from '@/utils/telegram';
 
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
@@ -68,6 +69,91 @@ export default function Home() {
     const timeoutId = setTimeout(initTelegramSafeArea, 100);
     
     return () => clearTimeout(timeoutId);
+  }, []);
+
+  // Блокировка вертикальной прокрутки в Telegram WebApp
+  useEffect(() => {
+    if (!isTelegramWebApp()) {
+      return; // В обычном браузере не нужна блокировка
+    }
+
+    const touchData = new Map<number, { startY: number; startX: number }>();
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Сохраняем начальные координаты для каждого касания
+      Array.from(e.touches).forEach(touch => {
+        touchData.set(touch.identifier, {
+          startY: touch.clientY,
+          startX: touch.clientX
+        });
+      });
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // Блокируем вертикальные свайпы, разрешаем горизонтальные для карусели
+      Array.from(e.changedTouches).forEach(touch => {
+        const data = touchData.get(touch.identifier);
+        if (!data) return;
+
+        const target = e.target as HTMLElement;
+        
+        // Проверяем, не является ли элемент частью карусели (где нужны горизонтальные свайпы)
+        const isCarouselElement = target.closest('[data-carousel]') || 
+                                  target.closest('.carousel-container') ||
+                                  target.closest('[class*="carousel"]');
+        
+        const deltaY = Math.abs(touch.clientY - data.startY);
+        const deltaX = Math.abs(touch.clientX - data.startX);
+        
+        if (isCarouselElement) {
+          // Для карусели блокируем только если вертикальное движение значительно больше горизонтального
+          if (deltaY > deltaX && deltaY > 15) {
+            e.preventDefault();
+          }
+        } else {
+          // Для всех остальных элементов блокируем вертикальные свайпы
+          if (deltaY > deltaX && deltaY > 5) {
+            e.preventDefault();
+          }
+        }
+      });
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      // Удаляем данные о касаниях
+      Array.from(e.changedTouches).forEach(touch => {
+        touchData.delete(touch.identifier);
+      });
+    };
+
+    // Блокируем прокрутку колесиком мыши
+    const preventWheelScroll = (e: WheelEvent) => {
+      // Разрешаем горизонтальную прокрутку для карусели
+      const target = e.target as HTMLElement;
+      const isCarouselElement = target.closest('[data-carousel]') || 
+                                target.closest('.carousel-container') ||
+                                target.closest('[class*="carousel"]');
+      
+      if (!isCarouselElement && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+      }
+    };
+
+    // Добавляем обработчики
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    document.addEventListener('wheel', preventWheelScroll, { passive: false });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+      document.removeEventListener('wheel', preventWheelScroll);
+      touchData.clear();
+    };
   }, []);
 
   // Измеряем высоту QuickStatsVariants и Header
@@ -305,7 +391,11 @@ export default function Home() {
       style={{ 
         maxWidth: '100vw',
         height: '100dvh', // Fallback для браузеров без поддержки dvh
-        minHeight: '-webkit-fill-available' // Fallback для Safari
+        minHeight: '-webkit-fill-available', // Fallback для Safari
+        // Блокируем вертикальную прокрутку в Telegram WebApp
+        overscrollBehavior: 'none',
+        overscrollBehaviorY: 'none',
+        touchAction: isTelegramWebApp() ? 'pan-x pinch-zoom' : 'auto' // Разрешаем только горизонтальные свайпы в Telegram
       }}
     >
       {/* Header с кнопкой "Создать питомца" */}

@@ -31,6 +31,7 @@ html {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   overflow-x: hidden;
+  overflow-y: hidden; /* Блокируем вертикальную прокрутку */
   max-width: 100vw;
   /* Фон на html, чтобы заполнять safe area без черных полос */
   background: linear-gradient(to bottom right, #0a0a0a, #1a0a1a, #0a1a1a);
@@ -38,6 +39,10 @@ html {
   min-height: -webkit-fill-available;
   /* Фон должен заполнять всю область, включая safe area */
   /* Не добавляем padding здесь, чтобы фон заполнял всю область */
+  /* Предотвращаем overscroll (bounce эффект) */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -48,12 +53,21 @@ body {
   max-width: 100vw;
   /* Фон наследуется от html */
   background: inherit;
-  -webkit-overflow-scrolling: touch;
+  /* Отключаем нативную прокрутку для предотвращения свайпов в Telegram */
   overflow-x: hidden;
+  overflow-y: hidden; /* Блокируем вертикальную прокрутку */
   /* Safe area padding убран - учитывается только в Header */
   /* Не добавляем padding-bottom, так как Dock сам учитывает safe-area-inset-bottom */
   padding-right: env(safe-area-inset-right);
   padding-left: env(safe-area-inset-left);
+  /* Предотвращаем overscroll (bounce эффект) и прокрутку */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  /* Блокируем touch действия, которые могут вызвать прокрутку */
+  /* В Telegram WebApp разрешаем только горизонтальные свайпы и pinch-zoom */
+  /* В обычном браузере это не повлияет на работу */
+  touch-action: pan-x pinch-zoom;
 }
 
 /* Минимальные размеры для touch targets */
@@ -68,11 +82,16 @@ button.carousel-indicator {
   min-width: 6px !important;
 }
 
-/* Улучшенная прокрутка для мобильных */
-@media (max-width: 768px) {
-  * {
-    -webkit-overflow-scrolling: touch;
-  }
+/* Блокируем прокрутку для всех элементов в Telegram WebApp */
+/* В обычном браузере это не повлияет, так как там нет нативной прокрутки */
+#root {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  touch-action: pan-x pinch-zoom; /* Разрешаем только горизонтальные свайпы */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 @keyframes gradientShift {
