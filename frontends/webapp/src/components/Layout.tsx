@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import Dock from './Dock';
 import ClickSpark from './ClickSpark';
+import Header from './Header';
 import { Home, Store, Coins, History, User, Settings } from 'lucide-react';
 import type { DockItemData } from './Dock';
 
@@ -45,6 +46,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen" style={{ position: 'relative' }}>
       {/* Глобальный эффект вспышек при кликах */}
       <ClickSpark />
+      {/* Header будет рендериться только на странице Home через children */}
       {children}
       <Dock items={dockItems} />
     </div>
