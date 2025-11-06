@@ -27,6 +27,7 @@ export default function Home() {
   const [dockHeight, setDockHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(56); // Начальная высота Header
   const [tgContentSafeAreaBottom, setTgContentSafeAreaBottom] = useState(0); // Telegram content safe area снизу
+  const [containerPaddingX, setContainerPaddingX] = useState(6); // Отступы контейнера (адаптивные)
 
   // Инициализация Telegram WebApp и получение content safe area
   useEffect(() => {
@@ -241,8 +242,12 @@ export default function Home() {
       // Если еще не измерена, используем примерное значение
       const effectiveHeaderHeight = headerHeight || (width < 640 ? 56 : width < 1024 ? 60 : 64);
       
-      // Отступы
-      const paddingX = width < 640 ? 16 : 24;
+      // Отступы (уменьшены примерно в 3 раза для карусели)
+      // Для контейнера используем минимальные отступы
+      const containerPaddingXValue = width < 640 ? 6 : 8; // Было 16/24, стало 6/8
+      setContainerPaddingX(containerPaddingXValue);
+      // Для карусели используем еще меньшие отступы (внутренний padding карусели убран)
+      const carouselPaddingX = 0; // Убираем внутренний padding карусели
       const gapBetweenSections = width < 640 ? 6 : width < 1024 ? 8 : 12;
       
       // Высота верхней секции (QuickStats + отступы)
@@ -255,22 +260,25 @@ export default function Home() {
       // Telegram content safe area снизу будет учтен в paddingBottom контейнера карусели
       const availableHeight = viewportHeight - effectiveHeaderHeight - topSectionHeight - totalDockHeight - indicatorsHeight - tgContentSafeAreaBottomValue;
       
+      // Ширина карусели = ширина экрана - padding контейнера - padding карусели
+      const carouselWidth = width - containerPaddingXValue * 2 - carouselPaddingX * 2;
+      
       if (width < 640) {
         // Мобильные устройства (< 640px)
         setCarouselSizes({ 
-          baseWidth: width - paddingX * 2,
+          baseWidth: carouselWidth,
           cardHeight: Math.max(300, availableHeight) // Минимальная высота 300px
         });
       } else if (width >= 640 && width < 1024) {
         // Планшеты (640px - 1023px)
         setCarouselSizes({ 
-          baseWidth: width - paddingX * 2,
+          baseWidth: carouselWidth,
           cardHeight: Math.max(400, availableHeight)
         });
       } else if (isIPadPro) {
         // iPad Pro (1024px ширина, высота > 1000px)
         setCarouselSizes({ 
-          baseWidth: Math.min(700, width - paddingX * 2),
+          baseWidth: Math.min(700, carouselWidth),
           cardHeight: Math.max(500, availableHeight)
         });
       } else if (width >= 1024 && width < 1280) {
@@ -402,9 +410,13 @@ export default function Home() {
       <Header onCreatePet={() => setIsCreateModalOpen(true)} />
       
       <div 
-        className="flex-1 flex flex-col overflow-hidden px-4 sm:px-6" 
+        className="flex-1 flex flex-col overflow-hidden" 
         style={{ 
-          paddingTop: `${headerHeight}px`
+          paddingTop: `${headerHeight}px`,
+          // Уменьшенные отступы для карусели (примерно в 3 раза меньше)
+          // Было 16px/24px, стало 6px/8px
+          paddingLeft: `${containerPaddingX}px`,
+          paddingRight: `${containerPaddingX}px`
         }}
       >
         {/* Верхняя секция: быстрые статусы */}

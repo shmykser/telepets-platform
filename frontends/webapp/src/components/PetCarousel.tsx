@@ -521,7 +521,8 @@ export default function PetCarousel({
         width: `${baseWidth}px`,
         maxWidth: '100%',
         height: '100%',
-        padding: '0 16px',
+        // Убираем внутренний padding карусели для уменьшения отступов от краев
+        padding: '0',
         // Разрешаем горизонтальные свайпы для карусели
         touchAction: 'pan-x pinch-zoom'
       }}
