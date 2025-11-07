@@ -1,30 +1,42 @@
 /**
  * Централизованная конфигурация эндпоинтов для разных окружений
+ * 
+ * ВАЖНО: Backend endpoints находятся по пути /api/...
+ * - В dev: используем относительные пути, которые проксируются через Vite
+ * - В prod: используем полные URL с /api/...
  */
 
 const isDev = (import.meta as any).env.DEV
 const isProd = (import.meta as any).env.PROD
 
+// Константы для путей API (для избежания ошибок при копировании)
+const API_BASE_URL_DEV = '' // Относительный путь для проксирования
+const API_BASE_URL_PROD = 'https://telepets-api-docker.onrender.com'
+const API_PET_IMAGES_PATH = '/api/pet-images' // Backend endpoint: /api/pet-images
+
 const DEV_CONFIG = {
   api: {
     // В dev режиме используем относительные пути для проксирования через Vite
     // Это решает проблему CORS автоматически
-    url: '', // Пустая строка = текущий origin (localhost:3001)
+    url: API_BASE_URL_DEV, // Пустая строка = текущий origin (localhost:3001)
     directBackendUrl: 'http://localhost:8080',
   },
   petImages: {
-    // Используем относительный путь для проксирования через Vite
+    // В dev: относительный путь /pet-images проксируется через vite.config.ts на /api/pet-images
+    // См. vite.config.ts: proxy['/pet-images'] -> rewrite: (path) => `/api${path}`
     url: '/pet-images',
   },
 } as const
 
 const PROD_CONFIG = {
   api: {
-    url: 'https://telepets-api-docker.onrender.com',
+    url: API_BASE_URL_PROD,
     directBackendUrl: '',
   },
   petImages: {
-    url: 'https://telepets-api-docker.onrender.com/pet-images',
+    // ВАЖНО: В production используем полный URL с /api/pet-images
+    // Backend endpoint находится по /api/pet-images (см. backend/main.py: app.include_router(pet_images.router, prefix="/api"))
+    url: `${API_BASE_URL_PROD}${API_PET_IMAGES_PATH}`,
   },
 } as const
 
