@@ -1,9 +1,10 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Stack from './Stack';
 import type { StackCard } from './Stack';
 import GlassmorphismTextWindow from './GlassmorphismTextWindow';
 import { cn } from '../utils';
+import { getTelegramWebApp, isTelegramWebApp } from '../utils/telegram';
 
 export interface StackAndTextProps {
   stackCards?: StackCard[];
@@ -23,6 +24,49 @@ export default function StackAndText({
   const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
   const stackContainerRef = useRef<HTMLDivElement>(null);
   const [cardDimensions, setCardDimensions] = useState({ width: 240, height: 320 });
+  const [contentSafeAreaInset, setContentSafeAreaInset] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
+
+  // Инициализация и отслеживание Telegram content safe area insets
+  useEffect(() => {
+    if (!isTelegramWebApp()) return;
+
+    const tgWebApp = getTelegramWebApp();
+    if (!tgWebApp) return;
+
+    // Получаем начальные значения safe area insets
+    const updateSafeAreaInset = () => {
+      if (tgWebApp?.contentSafeAreaInset) {
+        setContentSafeAreaInset({
+          top: tgWebApp.contentSafeAreaInset.top || 0,
+          bottom: tgWebApp.contentSafeAreaInset.bottom || 0,
+          left: tgWebApp.contentSafeAreaInset.left || 0,
+          right: tgWebApp.contentSafeAreaInset.right || 0,
+        });
+      } else {
+        // Fallback: пытаемся получить из CSS переменных
+        const rootStyle = getComputedStyle(document.documentElement);
+        setContentSafeAreaInset({
+          top: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-top') || '0', 10),
+          bottom: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom') || '0', 10),
+          left: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-left') || '0', 10),
+          right: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-right') || '0', 10),
+        });
+      }
+    };
+
+    updateSafeAreaInset();
+
+    // Подписываемся на изменения content safe area
+    if (tgWebApp.onEvent) {
+      tgWebApp.onEvent('contentSafeAreaChanged', updateSafeAreaInset);
+    }
+
+    return () => {
+      if (tgWebApp?.offEvent) {
+        tgWebApp.offEvent('contentSafeAreaChanged', updateSafeAreaInset);
+      }
+    };
+  }, []);
 
   // Адаптивные размеры карточек на основе доступной высоты контейнера
   useLayoutEffect(() => {
@@ -31,10 +75,16 @@ export default function StackAndText({
         const containerHeight = stackContainerRef.current.clientHeight;
         const containerWidth = stackContainerRef.current.clientWidth;
         
-        // Вычисляем размеры карточек с учетом доступного пространства
-        // Оставляем отступы (примерно 10% сверху и снизу)
-        const availableHeight = containerHeight * 0.9;
-        const availableWidth = containerWidth * 0.9;
+        // Учитываем Telegram content safe area insets
+        const safeAreaTop = contentSafeAreaInset.top || 0;
+        const safeAreaBottom = contentSafeAreaInset.bottom || 0;
+        const safeAreaLeft = contentSafeAreaInset.left || 0;
+        const safeAreaRight = contentSafeAreaInset.right || 0;
+        
+        // Вычисляем размеры карточек с учетом доступного пространства и safe area
+        // Оставляем отступы (примерно 10% сверху и снизу) + safe area
+        const availableHeight = containerHeight * 0.9 - safeAreaTop - safeAreaBottom;
+        const availableWidth = containerWidth * 0.9 - safeAreaLeft - safeAreaRight;
         
         // Сохраняем пропорции карточек (240:320 = 3:4)
         const aspectRatio = 3 / 4;
@@ -60,11 +110,20 @@ export default function StackAndText({
       resizeObserver.observe(stackContainerRef.current);
     }
 
+    // Подписываемся на Telegram viewportChanged событие для обновления размеров
+    const tgWebApp = getTelegramWebApp();
+    if (tgWebApp?.onEvent) {
+      tgWebApp.onEvent('viewportChanged', updateCardDimensions);
+    }
+
     return () => {
       window.removeEventListener('resize', updateCardDimensions);
       resizeObserver.disconnect();
+      if (tgWebApp?.offEvent) {
+        tgWebApp.offEvent('viewportChanged', updateCardDimensions);
+      }
     };
-  }, []);
+  }, [contentSafeAreaInset]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

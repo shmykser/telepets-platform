@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { getTelegramWebApp, isTelegramWebApp } from '../utils/telegram';
 
 export interface DialogEnhancedProps {
   open: boolean;
@@ -27,6 +28,49 @@ export default function DialogEnhanced({
   fullWidth = false
 }: DialogEnhancedProps) {
   const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
+  const [contentSafeAreaInset, setContentSafeAreaInset] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
+
+  // Инициализация и отслеживание Telegram content safe area insets для fullWidth режима
+  useEffect(() => {
+    if (!fullWidth || !isTelegramWebApp()) return;
+
+    const tgWebApp = getTelegramWebApp();
+    if (!tgWebApp) return;
+
+    // Получаем начальные значения safe area insets
+    const updateSafeAreaInset = () => {
+      if (tgWebApp?.contentSafeAreaInset) {
+        setContentSafeAreaInset({
+          top: tgWebApp.contentSafeAreaInset.top || 0,
+          bottom: tgWebApp.contentSafeAreaInset.bottom || 0,
+          left: tgWebApp.contentSafeAreaInset.left || 0,
+          right: tgWebApp.contentSafeAreaInset.right || 0,
+        });
+      } else {
+        // Fallback: пытаемся получить из CSS переменных
+        const rootStyle = getComputedStyle(document.documentElement);
+        setContentSafeAreaInset({
+          top: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-top') || '0', 10),
+          bottom: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-bottom') || '0', 10),
+          left: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-left') || '0', 10),
+          right: parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-right') || '0', 10),
+        });
+      }
+    };
+
+    updateSafeAreaInset();
+
+    // Подписываемся на изменения content safe area
+    if (tgWebApp.onEvent) {
+      tgWebApp.onEvent('contentSafeAreaChanged', updateSafeAreaInset);
+    }
+
+    return () => {
+      if (tgWebApp?.offEvent) {
+        tgWebApp.offEvent('contentSafeAreaChanged', updateSafeAreaInset);
+      }
+    };
+  }, [fullWidth]);
 
   useEffect(() => {
     if (open) {
@@ -75,7 +119,15 @@ export default function DialogEnhanced({
           />
 
           {/* Dialog */}
-          <div className={`fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none ${fullWidth ? 'p-0' : 'p-4'}`}>
+          <div 
+            className={`fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none ${fullWidth ? 'p-0' : 'p-4'}`}
+            style={fullWidth && isTelegramWebApp() ? {
+              paddingTop: `${contentSafeAreaInset.top}px`,
+              paddingBottom: `${contentSafeAreaInset.bottom}px`,
+              paddingLeft: `${contentSafeAreaInset.left}px`,
+              paddingRight: `${contentSafeAreaInset.right}px`,
+            } : undefined}
+          >
             <motion.div
               className={`relative w-full ${fullWidth ? 'h-full' : getSizeStyles()} pointer-events-auto ${className}`}
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -118,6 +170,10 @@ export default function DialogEnhanced({
                       <motion.button
                         onClick={onClose}
                         className="absolute top-4 right-4 z-50 p-2 hover:bg-white/10 rounded-lg transition-colors bg-white/5 backdrop-blur-md border border-white/20"
+                        style={isTelegramWebApp() ? {
+                          top: `${16 + (contentSafeAreaInset.top || 0)}px`,
+                          right: `${16 + (contentSafeAreaInset.right || 0)}px`,
+                        } : undefined}
                         whileHover={{ scale: 1.1, rotate: 90 }}
                         whileTap={{ scale: 0.9 }}
                         aria-label="Закрыть"
