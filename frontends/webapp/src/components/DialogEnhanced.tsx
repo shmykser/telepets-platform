@@ -12,6 +12,7 @@ export interface DialogEnhancedProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'default' | 'glass' | 'minimal';
   className?: string;
+  fullWidth?: boolean;
 }
 
 export default function DialogEnhanced({
@@ -22,7 +23,8 @@ export default function DialogEnhanced({
   children,
   size = 'md',
   variant = 'glass',
-  className = ''
+  className = '',
+  fullWidth = false
 }: DialogEnhancedProps) {
   const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
 
@@ -73,9 +75,9 @@ export default function DialogEnhanced({
           />
 
           {/* Dialog */}
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+          <div className={`fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none ${fullWidth ? 'p-0' : 'p-4'}`}>
             <motion.div
-              className={`relative w-full ${getSizeStyles()} pointer-events-auto ${className}`}
+              className={`relative w-full ${fullWidth ? 'h-full' : getSizeStyles()} pointer-events-auto ${className}`}
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -84,32 +86,49 @@ export default function DialogEnhanced({
             >
               {variant === 'glass' ? (
                 <>
-                  {/* Animated gradient border */}
-                  <div
-                    className="absolute -inset-0.5 rounded-3xl opacity-75 blur-xl"
-                    style={{
-                      backgroundImage: `linear-gradient(
-                        135deg,
-                        #60A5FA 0%,
-                        #34D399 25%,
-                        #A78BFA 50%,
-                        #F472B6 75%,
-                        #60A5FA 100%
-                      )`,
-                      backgroundSize: '200% 200%',
-                      animation: 'gradientShift 4s ease infinite',
-                      backgroundPosition: `${glowPosition.x}% ${glowPosition.y}%`
-                    }}
-                  />
+                  {/* Animated gradient border - только если не fullWidth */}
+                  {!fullWidth && (
+                    <div
+                      className="absolute -inset-0.5 rounded-3xl opacity-75 blur-xl"
+                      style={{
+                        background: `linear-gradient(
+                          135deg,
+                          #60A5FA 0%,
+                          #34D399 25%,
+                          #A78BFA 50%,
+                          #F472B6 75%,
+                          #60A5FA 100%
+                        )`,
+                        backgroundSize: '200% 200%',
+                        animation: 'gradientShift 4s ease infinite',
+                        backgroundPosition: `${glowPosition.x}% ${glowPosition.y}%`
+                      }}
+                    />
+                  )}
 
                   {/* Glassmorphism container */}
-                  <div className="relative rounded-3xl bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl border border-white/10 overflow-hidden">
-                    {/* Frosted glass overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                  <div className={`relative ${fullWidth ? 'rounded-none h-full bg-transparent' : 'rounded-3xl bg-gradient-to-br from-gray-900/95 via-gray-800/90 to-gray-900/95 backdrop-blur-xl border border-white/10'} overflow-hidden`}>
+                    {/* Frosted glass overlay - только если не fullWidth */}
+                    {!fullWidth && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                    )}
+
+                    {/* Close button for fullWidth mode */}
+                    {fullWidth && (
+                      <motion.button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 z-50 p-2 hover:bg-white/10 rounded-lg transition-colors bg-white/5 backdrop-blur-md border border-white/20"
+                        whileHover={{ scale: 1.1, rotate: 90 }}
+                        whileTap={{ scale: 0.9 }}
+                        aria-label="Закрыть"
+                      >
+                        <X className="w-5 h-5 text-white" />
+                      </motion.button>
+                    )}
 
                     {/* Content */}
-                    <div className="relative p-6">
-                      {(title || description) && (
+                    <div className={`relative h-full ${fullWidth ? 'p-0' : title || description ? 'p-6' : 'p-2'}`}>
+                      {(title || description) && !fullWidth && (
                         <div className="mb-6">
                           <div className="flex items-center justify-between">
                             {title && (

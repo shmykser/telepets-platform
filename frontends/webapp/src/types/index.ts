@@ -8,6 +8,12 @@ export interface Pet {
   next_stage?: string
   time_to_next_stage_seconds?: number
   image_url?: string
+  image_egg_url?: string
+  image_baby_url?: string
+  image_adult_url?: string
+  image_egg_transparent_url?: string
+  image_baby_transparent_url?: string
+  image_adult_transparent_url?: string
   created_at?: string
   updated_at?: string
   total_pets?: number
@@ -15,6 +21,8 @@ export interface Pet {
   dead_pets?: number
   wallet?: Wallet
   message?: string
+  creature_json?: any
+  creature?: any
 }
 
 export interface Wallet {

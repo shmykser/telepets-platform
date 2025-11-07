@@ -57,6 +57,7 @@ async def get_pet_image(
     user_id: str,
     pet_name: str,
     transparent: bool = False,
+    stage: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -66,6 +67,7 @@ async def get_pet_image(
         user_id: ID пользователя
         pet_name: Имя питомца
         transparent: Если True, возвращает изображение с прозрачным фоном (если доступно)
+        stage: Стадия питомца (egg, baby, adult). Если не указана, используется текущая стадия питомца
         db: Сессия базы данных
     """
     # Получаем питомца
@@ -74,18 +76,27 @@ async def get_pet_image(
     if not pet:
         raise HTTPException(status_code=404, detail="Питомец не найден")
 
-    stage_key = pet.state.value if pet.state.value in {"egg", "baby", "adult"} else "adult"
+    # Определяем стадию: из параметра запроса или из текущей стадии питомца
+    if stage and stage in {"egg", "baby", "adult"}:
+        stage_key = stage
+    else:
+        stage_key = pet.state.value if pet.state.value in {"egg", "baby", "adult"} else "adult"
 
-    # Выбираем URL в зависимости от запроса
+    # Presigned URLs на лету: генерируем URL из ключа объекта, не читаем из БД
+    # Это решает проблему истечения URL и соответствует best practices
+    # Но для обратной совместимости сначала проверяем старые URL из БД
+    r2_storage = R2Storage()
+    from config.settings import get_legacy_pet_image_key
+    
+    # Сначала проверяем старые URL из БД (для обратной совместимости)
+    # Если они есть и валидны, используем их
     if transparent:
-        # Сначала ищем прозрачное изображение
         url_map_transparent = {
             "egg": getattr(pet, "image_egg_transparent_url", None),
             "baby": getattr(pet, "image_baby_transparent_url", None),
             "adult": getattr(pet, "image_adult_transparent_url", None),
         }
         existing_url = url_map_transparent.get(stage_key)
-        # Если прозрачного варианта нет, используем обычный
         if not existing_url:
             url_map_fallback = {
                 "egg": getattr(pet, "image_egg_url", None),
@@ -94,100 +105,85 @@ async def get_pet_image(
             }
             existing_url = url_map_fallback.get(stage_key)
     else:
-        # Обычное изображение
         url_map = {
             "egg": getattr(pet, "image_egg_url", None),
             "baby": getattr(pet, "image_baby_url", None),
             "adult": getattr(pet, "image_adult_url", None),
         }
         existing_url = url_map.get(stage_key)
-    if existing_url:
-        # Проверяем и перегенерируем URL если нужно:
-        # 1. URL без подписи (не содержит ?)
-        # 2. URL содержит старый формат /pets/pets/ (двойной префикс)
-        # 3. URL может быть истёкшим (будет перегенерирован при 403)
-        should_regenerate = False
-        if "r2.cloudflarestorage.com" in existing_url:
-            # Проверяем наличие подписи и правильность пути
-            # Двойной префикс (например /pets/pets/) означает устаревший формат
-            double_prefix = f"{LEGACY_R2_PREFIX}{LEGACY_R2_PREFIX}"
-            if "?" not in existing_url or double_prefix in existing_url:
-                should_regenerate = True
+    
+    # Если есть старый URL из БД, пробуем использовать его
+    if existing_url and "r2.cloudflarestorage.com" in existing_url:
+        try:
+            logger.info(f"Пробуем использовать старый URL из БД: {existing_url[:100]}...")
+            return await _proxy_r2_image(existing_url, stage_key)
+        except HTTPException as e:
+            if e.status_code in (403, 404, 502):
+                logger.warning(f"Старый URL истек или недоступен (HTTP {e.status_code}), ищем по ключам...")
+                # URL истек, продолжаем поиск по ключам
+            else:
+                raise
+        except Exception as e:
+            logger.error(f"Ошибка при использовании старого URL: {str(e)}", exc_info=True)
+            # Продолжаем поиск по ключам
+    
+    # Определяем ключ объекта в зависимости от запроса (прозрачное или обычное)
+    if transparent:
+        # Сначала пробуем прозрачное изображение
+        key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp", transparent=True)
+        key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=True)
+        key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=True)
         
-        if should_regenerate:
-            # Перегенерируем URL с правильным ключом
-            # Пробуем оба варианта: с префиксом pets/ и без (для обратной совместимости)
-            from config.settings import get_legacy_pet_image_key
-            # Пробуем WebP и PNG для обратной совместимости
-            key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp")
-            key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
-            key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png")
+        # Пробуем найти прозрачное изображение
+        found_key = None
+        for key_variant in [key, key_png, key_with_prefix]:
+            logger.debug(f"Проверка существования ключа (transparent): {key_variant}")
+            if r2_storage.key_exists(key_variant):
+                found_key = key_variant
+                logger.info(f"Найдено прозрачное изображение: {found_key}")
+                break
+        
+        # Если прозрачного нет, пробуем обычное
+        if not found_key:
+            key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp", transparent=False)
+            key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
+            key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
             
-            r2_storage = R2Storage()
-            # Пробуем сначала новый формат WebP, затем PNG, затем старый формат
-            found_key = None
             for key_variant in [key, key_png, key_with_prefix]:
+                logger.debug(f"Проверка существования ключа (fallback): {key_variant}")
                 if r2_storage.key_exists(key_variant):
                     found_key = key_variant
+                    logger.info(f"Найдено обычное изображение: {found_key}")
                     break
-            
-            # Используем найденный ключ или новый формат по умолчанию
-            signed = r2_storage.make_url(found_key if found_key else key)
-            # Сохраняем URL в БД (проверяем наличие атрибутов для обратной совместимости)
-            if hasattr(pet, 'image_egg_url') and stage_key == "egg":
-                pet.image_egg_url = signed
-            elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
-                pet.image_baby_url = signed
-            elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
-                pet.image_adult_url = signed
-            await db.commit()
-            existing_url = signed
+    else:
+        # Обычное изображение
+        key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp", transparent=False)
+        key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
+        key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
         
-        # Проксируем через backend для CORS, если URL из R2
-        if "r2.cloudflarestorage.com" in existing_url:
-            try:
-                return await _proxy_r2_image(existing_url, stage_key)
-            except HTTPException as e:
-                # Если получили 403/404, возможно URL истёк или файл перемещён
-                # Перегенерируем URL и попробуем снова
-                if e.status_code in (403, 404, 502):
-                    # URL истёк или файл не найден - ищем файл по всем вариантам пути
-                    from config.settings import get_legacy_pet_image_key
-                    key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp")
-                    key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png")
-                    key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png")
-                    
-                    r2_storage = R2Storage()
-                    found_key = None
-                    # Проверяем все варианты пути (WebP, PNG, старый формат)
-                    for key_variant in [key, key_png, key_with_prefix]:
-                        if r2_storage.key_exists(key_variant):
-                            found_key = key_variant
-                            break
-                    
-                    if found_key:
-                        # Файл найден - генерируем новый URL и сохраняем
-                        new_url = r2_storage.make_url(found_key)
-                        if hasattr(pet, 'image_egg_url') and stage_key == "egg":
-                            pet.image_egg_url = new_url
-                        elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
-                            pet.image_baby_url = new_url
-                        elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
-                            pet.image_adult_url = new_url
-                        await db.commit()
-                        # Пробуем получить изображение
-                        return await _proxy_r2_image(new_url, stage_key)
-                    # Если файл не найден - продолжаем выполнение для генерации нового изображения
-                    # (код ниже обработает это)
-        
-        # Fallback: если проксирование не удалось или URL не из R2, делаем редирект с заголовками кэширования
-        return RedirectResponse(
-            existing_url, 
-            status_code=307,
-            headers={
-                "Cache-Control": "public, max-age=604800, immutable",
-            }
-        )
+        # Пробуем найти изображение (WebP, PNG, старый формат)
+        found_key = None
+        for key_variant in [key, key_png, key_with_prefix]:
+            logger.debug(f"Проверка существования ключа: {key_variant}")
+            if r2_storage.key_exists(key_variant):
+                found_key = key_variant
+                logger.info(f"Найдено изображение: {found_key}")
+                break
+    
+    # Если изображение найдено, генерируем presigned URL на лету и проксируем
+    if found_key:
+        try:
+            logger.info(f"Генерация presigned URL для ключа: {found_key}")
+            # Генерируем presigned URL на лету (не сохраняем в БД)
+            presigned_url = r2_storage.make_url(found_key)
+            logger.debug(f"Presigned URL сгенерирован: {presigned_url[:100]}...")
+            return await _proxy_r2_image(presigned_url, stage_key)
+        except Exception as e:
+            logger.error(f"Ошибка при генерации presigned URL для {found_key}: {str(e)}", exc_info=True)
+            # Если не удалось сгенерировать URL, продолжаем к генерации изображения
+            pass
+    else:
+        logger.warning(f"Изображение не найдено в R2 для {user_id}/{pet_name}/{stage_key} (transparent={transparent}). Пробовали ключи: {[key, key_png, key_with_prefix]}")
 
     # Генерация через реплику и ПРЯМАЯ загрузка в R2 (без локальных файлов и без base64)
     prompt_en = _ensure_prompt(user_id, pet_name, stage_key)
@@ -218,16 +214,13 @@ async def get_pet_image(
             with open(svg_path, 'rb') as f:
                 svg_data = f.read()
             key = build_pet_image_key(user_id, pet_name, stage_key, ext="svg")
+            # Загружаем в R2, но не сохраняем URL в БД (используем presigned URLs на лету)
             url = R2Storage().upload_bytes(key, svg_data, "image/svg+xml")
-            
-            # Сохраняем URL в БД (проверяем наличие атрибутов)
-            if hasattr(pet, 'image_egg_url') and stage_key == "egg":
-                pet.image_egg_url = url
-            elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
-                pet.image_baby_url = url
-            elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
-                pet.image_adult_url = url
+            # URL не сохраняем в БД - генерируем presigned URL на лету при запросе
             await db.commit()
+            
+            # Возвращаем изображение через проксирование presigned URL
+            return await _proxy_r2_image(url, stage_key)
         except Exception as fallback_error:
             # Если и альтернативный генератор не сработал
             raise HTTPException(status_code=503, detail=f"Генерация изображения недоступна: {str(fallback_error)}")
@@ -238,18 +231,12 @@ async def get_pet_image(
         data = buf.getvalue()
         key = build_pet_image_key(user_id, pet_name, stage_key, ext=output_format)
         content_type = f"image/{output_format}"
+        # Загружаем в R2, но не сохраняем URL в БД (используем presigned URLs на лету)
         url = R2Storage().upload_bytes(key, data, content_type)
-        
-        # Сохраняем URL основного изображения в БД (проверяем наличие атрибутов)
-        if hasattr(pet, 'image_egg_url') and stage_key == "egg":
-            pet.image_egg_url = url
-        elif hasattr(pet, 'image_baby_url') and stage_key == "baby":
-            pet.image_baby_url = url
-        elif hasattr(pet, 'image_adult_url') and stage_key == "adult":
-            pet.image_adult_url = url
         
         # Удаляем фон (если включено)
         img_transparent = None
+        url_transparent = None
         bg_removal_service = BackgroundRemovalService()
         if bg_removal_service.is_enabled():
             img_transparent = bg_removal_service.remove_background(img)
@@ -263,22 +250,15 @@ async def get_pet_image(
                 key_transparent = build_pet_image_key(
                     user_id, pet_name, stage_key, ext="webp", transparent=True
                 )
+                # Загружаем в R2, но не сохраняем URL в БД (используем presigned URLs на лету)
                 url_transparent = R2Storage().upload_bytes(
                     key_transparent, data_transparent, "image/webp"
                 )
-                
-                # Сохраняем URL прозрачного изображения в БД (проверяем наличие атрибутов)
-                if hasattr(pet, 'image_egg_transparent_url') and stage_key == "egg":
-                    pet.image_egg_transparent_url = url_transparent
-                elif hasattr(pet, 'image_baby_transparent_url') and stage_key == "baby":
-                    pet.image_baby_transparent_url = url_transparent
-                elif hasattr(pet, 'image_adult_transparent_url') and stage_key == "adult":
-                    pet.image_adult_transparent_url = url_transparent
         
         await db.commit()
         
         # Если запрошено прозрачное изображение и оно создано, используем его
-        if transparent and img_transparent:
+        if transparent and url_transparent:
             url = url_transparent
 
     # Всегда проксируем через backend для правильных заголовков кэширования
@@ -409,25 +389,11 @@ async def remove_background_from_existing_image(
     errors = []
     
     for stage_key in stages_to_process:
-        # Получаем URL обычного изображения
-        url_map = {
-            "egg": getattr(pet, "image_egg_url", None),
-            "baby": getattr(pet, "image_baby_url", None),
-            "adult": getattr(pet, "image_adult_url", None),
-        }
-        image_url = url_map.get(stage_key)
-        
-        # Проверяем, есть ли уже прозрачное изображение
-        transparent_url_map = {
-            "egg": getattr(pet, "image_egg_transparent_url", None),
-            "baby": getattr(pet, "image_baby_transparent_url", None),
-            "adult": getattr(pet, "image_adult_transparent_url", None),
-        }
-        existing_transparent = transparent_url_map.get(stage_key)
-        
-        if not image_url:
-            errors.append(f"Изображение для стадии '{stage_key}' не найдено (URL отсутствует в БД)")
-            continue
+        # Проверяем, есть ли уже прозрачное изображение (по ключу объекта)
+        key_transparent = build_pet_image_key(
+            user_id, pet_name, stage_key, ext="webp", transparent=True
+        )
+        existing_transparent = r2_storage.key_exists(key_transparent)
         
         if existing_transparent:
             processed.append({
@@ -437,7 +403,27 @@ async def remove_background_from_existing_image(
             })
             continue
         
+        # Генерируем ключ объекта для обычного изображения
+        key = build_pet_image_key(user_id, pet_name, stage_key, ext="webp", transparent=False)
+        key_png = build_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
+        from config.settings import get_legacy_pet_image_key
+        key_with_prefix = get_legacy_pet_image_key(user_id, pet_name, stage_key, ext="png", transparent=False)
+        
+        # Пробуем найти изображение (WebP, PNG, старый формат)
+        found_key = None
+        for key_variant in [key, key_png, key_with_prefix]:
+            if r2_storage.key_exists(key_variant):
+                found_key = key_variant
+                break
+        
+        if not found_key:
+            errors.append(f"Изображение для стадии '{stage_key}' не найдено в R2")
+            continue
+        
         try:
+            # Генерируем presigned URL на лету для загрузки изображения
+            image_url = r2_storage.make_url(found_key)
+            
             # Загружаем изображение из R2
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(image_url)
@@ -469,22 +455,16 @@ async def remove_background_from_existing_image(
                 key_transparent = build_pet_image_key(
                     user_id, pet_name, stage_key, ext="webp", transparent=True
                 )
+                # Загружаем прозрачное изображение в R2, но не сохраняем URL в БД
                 url_transparent = r2_storage.upload_bytes(
                     key_transparent, data_transparent, "image/webp"
                 )
-                
-                # Сохраняем URL прозрачного изображения в БД (проверяем наличие атрибутов)
-                if hasattr(pet, 'image_egg_transparent_url') and stage_key == "egg":
-                    pet.image_egg_transparent_url = url_transparent
-                elif hasattr(pet, 'image_baby_transparent_url') and stage_key == "baby":
-                    pet.image_baby_transparent_url = url_transparent
-                elif hasattr(pet, 'image_adult_transparent_url') and stage_key == "adult":
-                    pet.image_adult_transparent_url = url_transparent
+                # URL не сохраняем в БД - генерируем presigned URL на лету при запросе
                 
                 processed.append({
                     "stage": stage_key,
                     "status": "created",
-                    "transparent_url": url_transparent
+                    "message": f"Прозрачное изображение для стадии '{stage_key}' успешно создано"
                 })
                 
         except httpx.HTTPStatusError as e:

@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
         '/pet-images': {
           target: 'http://localhost:8080',
           changeOrigin: true,
+          rewrite: (path) => `/api${path}`, // Backend endpoint находится по /api/pet-images
         },
         '/static': {
           target: 'http://localhost:8080',

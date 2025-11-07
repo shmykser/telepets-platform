@@ -11,6 +11,7 @@ export interface PetCarouselProps {
   onHealthUpWithCost?: (pet: Pet) => void;
   onPlay?: (pet: Pet) => void;
   onResurrect?: (pet: Pet) => void;
+  onImageClick?: (pet: Pet) => void;
   wallet?: { coins: number };
   resurrectCost?: number;
   baseWidth?: number;
@@ -46,6 +47,7 @@ interface PetCardProps {
   onHealthUpWithCost?: (pet: Pet) => void;
   onPlay?: (pet: Pet) => void;
   onResurrect?: (pet: Pet) => void;
+  onImageClick?: (pet: Pet) => void;
   wallet?: { coins: number };
   resurrectCost: number;
   effectiveTransition: any;
@@ -66,6 +68,7 @@ const PetCard = React.memo(({
   onHealthUpWithCost,
   onPlay,
   onResurrect,
+  onImageClick,
   wallet,
   resurrectCost,
   effectiveTransition
@@ -158,7 +161,13 @@ const PetCard = React.memo(({
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className={`absolute inset-0 bg-gradient-to-br ${stageInfo.color} opacity-20`} />
 
-        <div className="relative w-full h-[65%] overflow-hidden rounded-t-3xl">
+        <div 
+          className="relative w-full h-[65%] overflow-hidden rounded-t-3xl cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImageClick?.(pet);
+          }}
+        >
           {imageUrl ? (
             <motion.div
               className="w-full h-full"
@@ -393,7 +402,8 @@ const PetCard = React.memo(({
     prevProps.pet.name === nextProps.pet.name &&
     prevProps.pet.health === nextProps.pet.health &&
     prevProps.pet.status === nextProps.pet.status &&
-    prevProps.pet.state === nextProps.pet.state;
+    prevProps.pet.state === nextProps.pet.state &&
+    prevProps.onImageClick === nextProps.onImageClick;
   
   const indexUnchanged = prevProps.index === nextProps.index;
   const itemWidthUnchanged = prevProps.itemWidth === nextProps.itemWidth;
@@ -411,6 +421,7 @@ export default function PetCarousel({
   onHealthUpWithCost,
   onPlay,
   onResurrect,
+  onImageClick,
   wallet,
   resurrectCost = 500,
   baseWidth = 380,
@@ -562,6 +573,7 @@ export default function PetCarousel({
             onHealthUpWithCost={onHealthUpWithCost}
             onPlay={onPlay}
             onResurrect={onResurrect}
+            onImageClick={onImageClick}
             wallet={wallet}
             resurrectCost={resurrectCost}
             effectiveTransition={effectiveTransition}

@@ -356,7 +356,8 @@ async def get_all_pets_summary_internal(user_id: str, db: AsyncSession):
         from config.settings import get_pet_image_api_url
         image_url = get_pet_image_api_url(pet.user_id, pet.name, base_url)
         
-        pets_data.append({
+        # Добавляем URL изображений для всех стадий
+        pet_data = {
             "id": pet.id,
             "name": pet.name,
             "state": pet.state.value,
@@ -368,7 +369,12 @@ async def get_all_pets_summary_internal(user_id: str, db: AsyncSession):
             "creature": creature,
             "prompts": prompts,
             "image_url": image_url,
-        })
+        }
+        
+        # URL изображений больше не возвращаем - frontend использует backend endpoint
+        # /pet-images/{user_id}/{pet_name} для получения изображений с presigned URLs на лету
+        
+        pets_data.append(pet_data)
     
     # Проверяем, есть ли живые питомцы
     if alive_pets == 0:

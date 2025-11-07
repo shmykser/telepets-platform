@@ -551,7 +551,7 @@ def get_pet_image_api_url(user_id: str, pet_name: str, base_url: Optional[str] =
     return f"{base_url}{API_PET_IMAGES_PATH}/{user_id}/{pet_name}"
 
 
-def get_legacy_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png") -> str:
+def get_legacy_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: str = "png", transparent: bool = False) -> str:
     """
     Строит ключ для старых файлов в R2 (для обратной совместимости).
     Использует LEGACY_R2_PREFIX.
@@ -561,14 +561,16 @@ def get_legacy_pet_image_key(user_id: str, pet_name: str, stage_key: str, ext: s
         pet_name: Имя питомца
         stage_key: Стадия питомца (egg, baby, adult)
         ext: Расширение файла (по умолчанию png)
+        transparent: Если True, добавляет суффикс "_transparent" для прозрачных изображений
     
     Returns:
-        Ключ для старых файлов, например: "pets/273065571/BHbh/baby.png"
+        Ключ для старых файлов, например: "pets/273065571/BHbh/baby.png" или "pets/273065571/BHbh/baby_transparent.png"
     """
     safe_user = user_id
     safe_pet = pet_name
     safe_stage = stage_key
-    base_path = f"{safe_user}/{safe_pet}/{safe_stage}.{ext}"
+    transparent_suffix = "_transparent" if transparent else ""
+    base_path = f"{safe_user}/{safe_pet}/{safe_stage}{transparent_suffix}.{ext}"
     return f"{LEGACY_R2_PREFIX}{base_path}"
 
 def get_stage_negative_prompt(stage_key: str, include_global: bool = True) -> str:

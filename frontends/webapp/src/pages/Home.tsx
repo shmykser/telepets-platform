@@ -4,11 +4,14 @@ import PetCarousel from '@/components/PetCarousel';
 import QuickStatsVariants from '@/components/QuickStatsVariants';
 import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
 import DialogEnhanced from '@/components/DialogEnhanced';
+import StackAndText from '@/components/StackAndText';
 import Header from '@/components/Header';
 import type { Pet } from '@/types';
+import type { StackCard } from '@/components/Stack';
 import { buildUrl } from '@/config/endpoints';
 import { getStoredUserId } from '@/utils';
 import { isTelegramWebApp } from '@/utils/telegram';
+import { getAvailableStages, formatCreatureJson } from '@/utils/petUtils';
 
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
@@ -16,6 +19,7 @@ export default function Home() {
   const userId = useMemo(() => getStoredUserId(), []);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [petName, setPetName] = useState('');
+  const [selectedPetForStack, setSelectedPetForStack] = useState<Pet | null>(null);
 
   // Refs для измерения высоты элементов
   const statsRef = useRef<HTMLDivElement>(null);
@@ -364,6 +368,36 @@ export default function Home() {
     }
   };
 
+  const handleImageClick = (pet: Pet) => {
+    setSelectedPetForStack(pet);
+  };
+
+  // Подготовка данных для StackAndText
+  const stackCards: StackCard[] = useMemo(() => {
+    if (!selectedPetForStack) return [];
+    
+    // Убеждаемся что у питомца есть user_id (берем из userId если отсутствует)
+    const petWithUserId = {
+      ...selectedPetForStack,
+      user_id: selectedPetForStack.user_id || userId
+    };
+    
+    const stages = getAvailableStages(petWithUserId);
+    return stages.map((stage, index) => ({
+      id: index + 1,
+      img: stage.imageUrl
+    }));
+  }, [selectedPetForStack, userId]);
+
+  // Получение creature_json для текстового окна
+  const creatureText = useMemo(() => {
+    if (!selectedPetForStack) return ['Выберите питомца для просмотра информации'];
+    
+    // Пытаемся получить creature_json из pet (может быть в разных форматах)
+    const creatureJson = (selectedPetForStack as any).creature || (selectedPetForStack as any).creature_json;
+    return formatCreatureJson(creatureJson);
+  }, [selectedPetForStack]);
+
   const handleCreatePet = (override?: boolean) => {
     if (petName.trim()) {
       createPet({ name: petName.trim(), override: override || false });
@@ -455,6 +489,7 @@ export default function Home() {
             onHealthUpWithCost={handleHealthUpWithCost}
             onPlay={handlePlay}
             onResurrect={handleResurrect}
+            onImageClick={handleImageClick}
             wallet={wallet}
             resurrectCost={500}
             baseWidth={carouselSizes?.baseWidth ?? 380}
@@ -484,6 +519,24 @@ export default function Home() {
           canCreateFree={true}
           walletCoins={wallet?.coins}
           paidCost={0}
+        />
+      </DialogEnhanced>
+
+      {/* Модальное окно StackAndText */}
+      <DialogEnhanced
+        open={selectedPetForStack !== null}
+        onClose={() => setSelectedPetForStack(null)}
+        variant="glass"
+        size="xl"
+        fullWidth={true}
+        title=""
+        description=""
+      >
+        <StackAndText
+          stackCards={stackCards}
+          text={creatureText}
+          title={selectedPetForStack?.name || 'Информация о питомце'}
+          typingSpeed={30}
         />
       </DialogEnhanced>
     </div>
