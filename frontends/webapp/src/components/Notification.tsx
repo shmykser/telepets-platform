@@ -54,6 +54,10 @@ export default function Notification() {
   return (
     <Toaster
       position="top-center"
+      gutter={12}
+      containerStyle={{
+        top: 'calc(var(--tg-content-safe-area-inset-top, var(--safe-area-inset-top, 0px)) + 12px)'
+      }}
       toastOptions={{
         duration: 4000,
         style: {
