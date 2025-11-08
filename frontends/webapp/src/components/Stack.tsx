@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from './ui/Card';
 import { cn } from '../utils';
@@ -69,7 +69,22 @@ export default function Stack({
 }: StackProps) {
   const [cards, setCards] = useState<StackCard[]>(cardsData);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
-  const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
+  const glowX = useMotionValue(50);
+  const glowY = useMotionValue(50);
+  const gradientRef = useRef<HTMLDivElement | null>(null);
+
+  const updateGradientPosition = (xPercent: number, yPercent: number) => {
+    if (!gradientRef.current) {
+      return;
+    }
+    gradientRef.current.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
+  };
+
+  useEffect(() => {
+    if (gradientRef.current) {
+      gradientRef.current.style.backgroundPosition = '50% 50%';
+    }
+  }, [cards]);
   const [modalDragX, setModalDragX] = useState(0);
 
   // Синхронизируем cards с cardsData при изменении пропсов
@@ -138,11 +153,17 @@ export default function Stack({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCardIndex, cards.length]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setGlowPosition({ x, y });
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse') {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+    const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+    glowX.set(xPercent);
+    glowY.set(yPercent);
+    updateGradientPosition(xPercent, yPercent);
   };
 
   return (
@@ -154,7 +175,7 @@ export default function Stack({
           height: cardDimensions.height,
           perspective: 600
         }}
-        onMouseMove={handleMouseMove}
+        onPointerMove={handlePointerMove}
       >
         {cards.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
@@ -195,6 +216,7 @@ export default function Stack({
                 {/* Animated gradient border for glassmorphism */}
                 {isTop && (
                   <div
+                    ref={isTop ? gradientRef : undefined}
                     className="absolute -inset-0.5 rounded-2xl opacity-75 blur-xl"
                     style={{
                       background: `linear-gradient(
@@ -207,7 +229,7 @@ export default function Stack({
                       )`,
                       backgroundSize: '200% 200%',
                       animation: 'gradientShift 4s ease infinite',
-                      backgroundPosition: `${glowPosition.x}% ${glowPosition.y}%`
+                      backgroundPosition: '50% 50%'
                     }}
                   />
                 )}

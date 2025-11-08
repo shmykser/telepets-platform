@@ -29,7 +29,11 @@ def _resolve_base_url(request: Request) -> Optional[str]:
 async def get_summary(user_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает summary по активному питомцу пользователя с поддержкой кеша и ETag."""
     try:
-        cache_entry = await CacheService.get_summary(user_id)
+        cache_entry = None
+        try:
+            cache_entry = await CacheService.get_summary(user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.debug("Не удалось прочитать summary из кеша для %s: %s", user_id, cache_error)
         requested_etag = request.headers.get("If-None-Match")
         ttl = CacheService.summary_ttl()
 
@@ -60,6 +64,49 @@ async def get_summary(user_id: str, request: Request, db: AsyncSession = Depends
     except Exception as exc:  # noqa: BLE001
         logger.exception("Ошибка получения summary для пользователя %s: %s", user_id, exc)
         fallback = PetSummaryService.empty_summary(user_id)
+        return JSONResponse(content=fallback)
+
+
+@router.get("/all")
+async def get_all_pets_summary(user_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Возвращает список всех питомцев пользователя."""
+    try:
+        cache_entry = None
+        try:
+            cache_entry = await CacheService.get_pets(user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.debug("Не удалось прочитать pets из кеша для %s: %s", user_id, cache_error)
+        requested_etag = request.headers.get("If-None-Match")
+        ttl = CacheService.pets_ttl()
+
+        if cache_entry:
+            if requested_etag and cache_entry.etag == requested_etag:
+                return Response(status_code=304, headers={"ETag": cache_entry.etag})
+
+            response = JSONResponse(content=cache_entry.data)
+            response.headers["ETag"] = cache_entry.etag
+            if ttl:
+                response.headers["Cache-Control"] = f"public, max-age={ttl}"
+            return response
+
+        base_url = _resolve_base_url(request)
+        pets_summary = await PetSummaryService.build_all_pets_summary(db, user_id, base_url)
+        etag = CacheService.compute_etag(pets_summary)
+
+        try:
+            await CacheService.set_pets(user_id, pets_summary, ttl=ttl)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.debug("Не удалось сохранить pets summary в кеш для %s: %s", user_id, cache_error)
+
+        response = JSONResponse(content=pets_summary)
+        response.headers["ETag"] = etag
+        if ttl:
+            response.headers["Cache-Control"] = f"public, max-age={ttl}"
+        return response
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Ошибка получения списка питомцев для пользователя %s: %s", user_id, exc)
+        fallback = PetSummaryService.empty_summary(user_id) | {"pets": []}
         return JSONResponse(content=fallback)
 
 

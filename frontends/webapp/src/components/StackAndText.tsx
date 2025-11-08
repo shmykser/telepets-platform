@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import React, { useRef, useLayoutEffect, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Stack from './Stack';
 import type { StackCard } from './Stack';
@@ -21,7 +21,6 @@ export default function StackAndText({
   typingSpeed = 30,
   className = ''
 }: StackAndTextProps) {
-  const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
   const stackContainerRef = useRef<HTMLDivElement>(null);
   const [cardDimensions, setCardDimensions] = useState({ width: 240, height: 320 });
   const [contentSafeAreaInset, setContentSafeAreaInset] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
@@ -125,20 +124,12 @@ export default function StackAndText({
     };
   }, [contentSafeAreaInset]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setGlowPosition({ x, y });
-  };
-
   return (
     <motion.div
       className={cn('relative w-full h-full', className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      onMouseMove={handleMouseMove}
     >
       <div className="flex flex-col lg:flex-row items-stretch justify-center gap-2 lg:gap-3 h-full w-full">
         {/* Stack Component - 60% ширины */}
