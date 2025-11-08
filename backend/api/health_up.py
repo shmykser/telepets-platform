@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from core.db import get_db
 from models import Pet, PetState, PetLifeStatus
 from config.settings import HEALTH_MAX, HEALTH_UP_AMOUNTS, STAGE_MESSAGES, HEALTH_MIN
+from services.cache_service import CacheService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -55,10 +56,10 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
     
     # Инвалидируем кеш после изменения
     try:
-        from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache
-        await invalidate_pets_cache(user_id)
-        await invalidate_summary_cache(user_id)
-    except Exception as e:
+        invalidated = await CacheService.invalidate_user(user_id, pets=True, summary=True)
+        if not invalidated:
+            logger.debug("Инвалидация кеша после health_up вернула False для пользователя %s", user_id)
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Ошибка инвалидации кеша после health_up: {e}")
     
     # Отправляем обновление через WebSocket

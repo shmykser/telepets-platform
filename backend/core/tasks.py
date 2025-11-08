@@ -4,6 +4,8 @@ from core.db import AsyncSessionLocal
 from models import Pet, PetState, PetLifeStatus, Notification, Auction, AuctionStatus
 from services.auction import AuctionService
 from services.stages import StageLifecycleService
+from services.cache_service import CacheService
+from services.pet_summary import PetSummaryService
 from config.settings import (
     HEALTH_DOWN_INTERVALS, 
     HEALTH_DOWN_AMOUNTS, 
@@ -149,18 +151,16 @@ async def decrease_health_task():
                                 
                                 # Инвалидируем кеш после перехода стадии
                                 try:
-                                    from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache
-                                    await invalidate_pets_cache(pet.user_id)
-                                    await invalidate_summary_cache(pet.user_id)
-                                except Exception as cache_error:
+                                    invalidated = await CacheService.invalidate_user(pet.user_id, pets=True, summary=True)
+                                    if not invalidated:
+                                        logger.debug("Инвалидация кеша вернула False для пользователя %s", pet.user_id)
+                                except Exception as cache_error:  # noqa: BLE001
                                     logger.warning(f"Ошибка инвалидации кеша после перехода стадии: {cache_error}")
                                 
                                 # Отправляем обновление через WebSocket
                                 try:
                                     from api.websocket import broadcast_pet_update
-                                    from api.summary import get_all_pets_summary_internal
-                                    # Получаем обновленные данные
-                                    pets_data = await get_all_pets_summary_internal(pet.user_id, db)
+                                    pets_data = await PetSummaryService.build_all_pets_summary(db, pet.user_id)
                                     await broadcast_pet_update(pet.user_id, "stage_changed", {
                                         "pet_id": pet.id,
                                         "pet_name": pet.name,

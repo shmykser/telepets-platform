@@ -13,6 +13,7 @@ from datetime import datetime
 
 from core.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from services.pet_summary import PetSummaryService
 
 logger = logging.getLogger(__name__)
 
@@ -184,11 +185,10 @@ async def websocket_pets(
         # Отправляем начальное состояние при подключении
         try:
             # Получаем начальные данные питомцев
-            from api.summary import get_all_pets_summary_internal
             from core.db import get_db
             # Используем async for для правильного управления сессией
             async for db in get_db():
-                pets_data = await get_all_pets_summary_internal(user_id, db)
+                pets_data = await PetSummaryService.build_all_pets_summary(db, user_id)
                 await websocket.send_json({
                     "type": "pets_update",
                     "data": pets_data,

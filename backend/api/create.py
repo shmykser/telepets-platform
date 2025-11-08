@@ -8,6 +8,8 @@ from services.economy import EconomyService
 import logging
 from services.prompt_store import generate_and_store_prompts
 from services.stages import StageLifecycleService
+from services.cache_service import CacheService
+from services.pet_summary import PetSummaryService
 from .validators import CreatePetRequest
 
 logger = logging.getLogger(__name__)
@@ -119,19 +121,17 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
         
         # Инвалидируем кеш после создания нового питомца
         try:
-            from cache.redis_client import invalidate_pets_cache, invalidate_summary_cache, invalidate_wallet_cache
-            await invalidate_pets_cache(user_id)
-            await invalidate_summary_cache(user_id)
-            await invalidate_wallet_cache(user_id)
-        except Exception as e:
+            invalidated = await CacheService.invalidate_user(user_id, pets=True, summary=True, wallet=True)
+            if not invalidated:
+                logger.debug("Инвалидация кеша вернула False для пользователя %s", user_id)
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Ошибка инвалидации кеша после create_pet: {e}")
         
         # Отправляем обновление через WebSocket
         try:
             from api.websocket import broadcast_pet_update, broadcast_wallet_update
             # Получаем обновленные данные для broadcast
-            from api.summary import get_all_pets_summary_internal
-            pets_data = await get_all_pets_summary_internal(user_id, db)
+            pets_data = await PetSummaryService.build_all_pets_summary(db, user_id)
             await broadcast_pet_update(user_id, "pet_created", {
                 "pet_id": new_pet.id,
                 "pet_name": new_pet.name,
