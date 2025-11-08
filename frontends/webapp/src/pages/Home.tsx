@@ -36,7 +36,16 @@ const calculateCarouselBaseWidth = (viewportWidth: number, availableWidth: numbe
 
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
-  const { healthUp, healthUpWithCost, resurrect, createPet, isCreating } = usePet();
+  const {
+    healthUp,
+    healthUpWithCost,
+    resurrect,
+    createPet,
+    isCreating,
+    isHealthUpLoading,
+    isHealthUpWithCostLoading,
+    isResurrecting
+  } = usePet();
   const userId = useMemo(() => getStoredUserId(), []);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [petName, setPetName] = useState('');
@@ -396,11 +405,21 @@ export default function Home() {
   }, [selectedPetForStack]);
 
   const handleCreatePet = (override?: boolean) => {
-    if (petName.trim()) {
-      createPet({ name: petName.trim(), override: override || false });
-      setPetName('');
-      setIsCreateModalOpen(false);
-    }
+    const trimmedName = petName.trim();
+    if (!trimmedName) return;
+
+    setIsCreateModalOpen(false);
+    createPet(
+      { name: trimmedName, override: override || false },
+      {
+        onSettled: () => {
+          setPetName('');
+        },
+        onError: () => {
+          // опционально можно вернуть модалку, но оставляем закрытой по требованиям
+        }
+      }
+    );
   };
 
   const handleCancelCreate = () => {
@@ -444,7 +463,10 @@ export default function Home() {
       }}
     >
       {/* Header с кнопкой "Создать питомца" */}
-      <Header onCreatePet={() => setIsCreateModalOpen(true)} />
+      <Header
+        onCreatePet={() => setIsCreateModalOpen(true)}
+        isCreateDisabled={isCreating}
+      />
       
       <div 
         className="flex-1 flex flex-col overflow-hidden" 
@@ -503,6 +525,9 @@ export default function Home() {
             loop={false}
             showIndicators={true}
             className="w-full h-full"
+            isHealthUpLoading={isHealthUpLoading}
+            isHealthUpWithCostLoading={isHealthUpWithCostLoading}
+            isResurrecting={isResurrecting}
           />
         </div>
       </div>

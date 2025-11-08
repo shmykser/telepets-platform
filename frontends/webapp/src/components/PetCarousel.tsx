@@ -22,6 +22,9 @@ export interface PetCarouselProps {
   loop?: boolean;
   showIndicators?: boolean;
   className?: string;
+  isHealthUpLoading?: boolean;
+  isHealthUpWithCostLoading?: boolean;
+  isResurrecting?: boolean;
 }
 
 const DRAG_BUFFER = 0;
@@ -51,6 +54,9 @@ interface PetCardProps {
   wallet?: { coins: number };
   resurrectCost: number;
   effectiveTransition: any;
+  isHealthUpLoading: boolean;
+  isHealthUpWithCostLoading: boolean;
+  isResurrecting: boolean;
 }
 
 // Выносим PetCard за пределы основного компонента для правильной работы React.memo
@@ -71,10 +77,15 @@ const PetCard = React.memo(({
   onImageClick,
   wallet,
   resurrectCost,
-  effectiveTransition
+  effectiveTransition,
+  isHealthUpLoading,
+  isHealthUpWithCostLoading,
+  isResurrecting
 }: PetCardProps) => {
   const isCardHovered = hoveredCardId === pet.id?.toString();
   const imgRef = useRef<HTMLImageElement>(null);
+  const [loadingAction, setLoadingAction] = useState<'free' | 'paid' | 'play' | 'resurrect' | null>(null);
+  const autoReleaseTimeout = useRef<number | null>(null);
   
   // ЛОГИКА ПОВОРОТОВ ИЗ CAROUSEL.TSX - НЕ МЕНЯТЬ!
   const range = [-(index + 1) * trackItemOffset, -index * trackItemOffset, -(index - 1) * trackItemOffset];
@@ -124,6 +135,82 @@ const PetCard = React.memo(({
 
   const stageInfo = getStageInfo(pet.state);
   const healthStatus = getHealthStatus();
+
+  const triggerActionFeedback = useCallback(
+    (action: 'free' | 'paid' | 'play' | 'resurrect', cb?: () => void, autoReleaseMs?: number) => {
+      if (autoReleaseTimeout.current) {
+        window.clearTimeout(autoReleaseTimeout.current);
+        autoReleaseTimeout.current = null;
+      }
+      setLoadingAction(action);
+      cb?.();
+      if (autoReleaseMs) {
+        autoReleaseTimeout.current = window.setTimeout(() => {
+          setLoadingAction(prev => (prev === action ? null : prev));
+          autoReleaseTimeout.current = null;
+        }, autoReleaseMs);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      if (autoReleaseTimeout.current) {
+        window.clearTimeout(autoReleaseTimeout.current);
+        autoReleaseTimeout.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHealthUpLoading && loadingAction === 'free') {
+      setLoadingAction(null);
+    }
+  }, [isHealthUpLoading, loadingAction]);
+
+  useEffect(() => {
+    if (!isHealthUpWithCostLoading && loadingAction === 'paid') {
+      setLoadingAction(null);
+    }
+  }, [isHealthUpWithCostLoading, loadingAction]);
+
+  useEffect(() => {
+    if (!isResurrecting && loadingAction === 'resurrect') {
+      setLoadingAction(null);
+    }
+  }, [isResurrecting, loadingAction]);
+
+  const isFreePending = loadingAction === 'free';
+  const isPaidPending = loadingAction === 'paid';
+  const isResurrectPending = loadingAction === 'resurrect';
+  const isPlayPending = loadingAction === 'play';
+
+  const isFreeBusy = isFreePending || isHealthUpLoading;
+  const isPaidBusy = isPaidPending || isHealthUpWithCostLoading;
+  const isResurrectBusy = isResurrectPending || isResurrecting;
+  const isPlayBusy = isPlayPending;
+  const canResurrect = !!wallet && wallet.coins >= resurrectCost;
+
+  const renderSpinner = () => (
+    <motion.span
+      className="relative z-10 flex items-center justify-center"
+      initial={{ opacity: 0, scale: 0.6 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2 }}
+    >
+      <span className="block h-4 w-4 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+    </motion.span>
+  );
+
+  const withPressOverlay = (action: 'free' | 'paid' | 'play' | 'resurrect', active: boolean) => (
+    <motion.div
+      className="absolute inset-0 bg-white/25"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: active ? 0.18 : 0 }}
+      transition={{ duration: 0.18 }}
+    />
+  );
 
   return (
     <motion.div
@@ -250,83 +337,117 @@ const PetCard = React.memo(({
 
           {isDead ? (
             <motion.button
-              className="w-full px-4 py-3 rounded-lg text-sm sm:text-base font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 rounded-lg text-sm sm:text-base font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
               style={{
-                backgroundImage: wallet && wallet.coins >= resurrectCost
+                backgroundImage: canResurrect
                   ? 'linear-gradient(90deg, #ec4899, #f43f5e, #dc2626, #ec4899)'
                   : 'linear-gradient(90deg, #6b7280, #4b5563, #374151, #6b7280)',
-                backgroundSize: wallet && wallet.coins >= resurrectCost ? '200% 100%' : '100% 100%',
-                opacity: wallet && wallet.coins >= resurrectCost ? 1 : 0.6,
-                cursor: wallet && wallet.coins >= resurrectCost ? 'pointer' : 'not-allowed'
+                backgroundSize: canResurrect ? '200% 100%' : '100% 100%',
+                opacity: canResurrect ? 1 : 0.6,
+                cursor: canResurrect && !isResurrectBusy ? 'pointer' : 'not-allowed'
               }}
-              animate={wallet && wallet.coins >= resurrectCost ? { backgroundPosition: ['0%', '100%', '0%'] } : {}}
+              animate={
+                canResurrect
+                  ? { backgroundPosition: ['0%', '100%', '0%'], scale: isResurrectBusy ? 0.95 : 1 }
+                  : { scale: isResurrectBusy ? 0.95 : 1 }
+              }
               transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-              whileHover={wallet && wallet.coins >= resurrectCost ? { scale: 1.02 } : {}}
-              whileTap={wallet && wallet.coins >= resurrectCost ? { scale: 0.98 } : {}}
-              disabled={!wallet || wallet.coins < resurrectCost}
+              whileHover={canResurrect && !isResurrectBusy ? { scale: 1.03 } : {}}
+              whileTap={canResurrect && !isResurrectBusy ? { scale: 0.93 } : {}}
+              disabled={!canResurrect || isResurrectBusy}
               onClick={(e) => {
                 e.stopPropagation();
-                if (wallet && wallet.coins >= resurrectCost && onResurrect) {
-                  onResurrect(pet);
+                if (canResurrect && onResurrect) {
+                  triggerActionFeedback('resurrect', () => onResurrect(pet));
                 }
               }}
+              aria-pressed={isResurrectPending}
+              aria-busy={isResurrectBusy}
             >
+              {withPressOverlay('resurrect', isResurrectPending)}
               <span className="text-lg">✨</span>
-              <span className="relative z-10">Воскресить питомца</span>
-              <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCost} монет</span>
+              {isResurrectBusy ? (
+                renderSpinner()
+              ) : (
+                <>
+                  <span className="relative z-10">Воскресить питомца</span>
+                  <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCost} монет</span>
+                </>
+              )}
             </motion.button>
           ) : (
             <div className="flex gap-2 flex-shrink-0">
               <motion.button
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
                 style={{
                   backgroundImage: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6)',
                   backgroundSize: '200% 100%'
                 }}
-                animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
+                animate={{
+                  backgroundPosition: ['0%', '100%', '0%'],
+                  scale: isFreeBusy ? 0.95 : 1
+                }}
                 transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={!isFreeBusy ? { scale: 1.06 } : {}}
+                whileTap={!isFreeBusy ? { scale: 0.92 } : {}}
+                disabled={isFreeBusy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onHealthUp?.(pet);
+                  triggerActionFeedback('free', () => onHealthUp?.(pet));
                 }}
+                aria-pressed={isFreePending}
+                aria-busy={isFreeBusy}
               >
-                <span className="relative z-10">Бесплатно</span>
+                {withPressOverlay('free', isFreePending)}
+                {isFreeBusy ? renderSpinner() : <span className="relative z-10">Бесплатно</span>}
               </motion.button>
               <motion.button
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
                 style={{
                   backgroundImage: 'linear-gradient(90deg, #a855f7, #ec4899, #f43f5e, #a855f7)',
                   backgroundSize: '200% 100%'
                 }}
-                animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
+                animate={{
+                  backgroundPosition: ['0%', '100%', '0%'],
+                  scale: isPaidBusy ? 0.95 : 1
+                }}
                 transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 0.5 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={!isPaidBusy ? { scale: 1.06 } : {}}
+                whileTap={!isPaidBusy ? { scale: 0.92 } : {}}
+                disabled={isPaidBusy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onHealthUpWithCost?.(pet);
+                  triggerActionFeedback('paid', () => onHealthUpWithCost?.(pet));
                 }}
+                aria-pressed={isPaidPending}
+                aria-busy={isPaidBusy}
               >
-                <span className="relative z-10">10 монет</span>
+                {withPressOverlay('paid', isPaidPending)}
+                {isPaidBusy ? renderSpinner() : <span className="relative z-10">10 монет</span>}
               </motion.button>
               <motion.button
-                className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px]"
+                className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
                 style={{
                   backgroundImage: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
                   backgroundSize: '200% 100%'
                 }}
-                animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
+                animate={{
+                  backgroundPosition: ['0%', '100%', '0%'],
+                  scale: isPlayBusy ? 0.95 : 1
+                }}
                 transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={!isPlayBusy ? { scale: 1.06 } : {}}
+                whileTap={!isPlayBusy ? { scale: 0.92 } : {}}
+                disabled={isPlayBusy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPlay?.(pet);
+                  triggerActionFeedback('play', () => onPlay?.(pet), 250);
                 }}
+                aria-pressed={isPlayPending}
+                aria-busy={isPlayBusy}
               >
-                <span className="relative z-10">🎮</span>
+                {withPressOverlay('play', isPlayPending)}
+                {isPlayBusy ? renderSpinner() : <span className="relative z-10">🎮</span>}
               </motion.button>
             </div>
           )}
@@ -410,8 +531,12 @@ const PetCard = React.memo(({
   const heightUnchanged = prevProps.adaptiveCardHeight === nextProps.adaptiveCardHeight;
   const offsetUnchanged = prevProps.trackItemOffset === nextProps.trackItemOffset;
   const hoveredUnchanged = prevProps.hoveredCardId === nextProps.hoveredCardId;
+  const loadingUnchanged =
+    prevProps.isHealthUpLoading === nextProps.isHealthUpLoading &&
+    prevProps.isHealthUpWithCostLoading === nextProps.isHealthUpWithCostLoading &&
+    prevProps.isResurrecting === nextProps.isResurrecting;
   
-  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged;
+  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged && loadingUnchanged;
 });
 
 export default function PetCarousel({
@@ -431,7 +556,10 @@ export default function PetCarousel({
   pauseOnHover = false,
   loop = false,
   showIndicators = true,
-  className = ''
+  className = '',
+  isHealthUpLoading = false,
+  isHealthUpWithCostLoading = false,
+  isResurrecting = false
 }: PetCarouselProps): React.JSX.Element {
   // ЛОГИКА ИЗ CAROUSEL.TSX - НЕ МЕНЯТЬ!
   const containerPadding = 16;
@@ -577,6 +705,9 @@ export default function PetCarousel({
             wallet={wallet}
             resurrectCost={resurrectCost}
             effectiveTransition={effectiveTransition}
+            isHealthUpLoading={isHealthUpLoading ?? false}
+            isHealthUpWithCostLoading={isHealthUpWithCostLoading ?? false}
+            isResurrecting={isResurrecting ?? false}
           />
         ))}
         </motion.div>

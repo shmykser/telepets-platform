@@ -148,7 +148,7 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
         
         # URL эндпоинта получения изображения (абсолютный URL для корректной загрузки с фронтенда)
         try:
-            from config.settings import get_pet_image_api_url, API_BASE_URL
+            from config.settings import API_BASE_URL
             # Используем base_url из request, если доступен, иначе из настроек
             if request is not None:
                 # Используем base_url из request для автоматического определения хоста
@@ -156,7 +156,7 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
             else:
                 # Fallback на настройки (для тестов и т.д.)
                 base_url = API_BASE_URL
-            image_url = get_pet_image_api_url(user_id, name, base_url)
+            image_url = PetSummaryService.build_image_url(new_pet, base_url)
             
             logger.info(f"✅ Создание питомца завершено успешно: user_id={user_id}, name={name}, pet_id={new_pet.id}")
             return {

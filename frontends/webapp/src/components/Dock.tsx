@@ -56,11 +56,12 @@ function DockItem({
   const isHovered = useMotionValue(0);
 
   const mouseDistance = useTransform(mouseX, val => {
-    const rect = ref.current?.getBoundingClientRect() ?? {
-      x: 0,
-      width: baseItemSize
-    };
-    return val - rect.x - baseItemSize / 2;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const centerX = rect.left + rect.width / 2;
+    return val - centerX;
   });
 
   const targetSize = useTransform(
@@ -70,7 +71,8 @@ function DockItem({
   );
   const size = useSpring(targetSize, spring);
 
-  const scale = useTransform(size, [baseItemSize, magnification], [1, 1.1]);
+  const maxScale = magnification <= 0 ? 1 : Math.max(1, magnification / baseItemSize);
+  const scale = useTransform(size, [baseItemSize, magnification], [1, maxScale]);
 
   const isHoveredRef = React.useRef(isHovered);
   
@@ -306,10 +308,10 @@ export default function Dock({
 
   return (
     <motion.div
-      onMouseMove={({ pageX }) => {
+      onMouseMove={({ clientX }) => {
         if (!isMobile) {
           isHovered.set(1);
-          mouseX.set(pageX);
+          mouseX.set(clientX);
         }
       }}
       onMouseLeave={() => {

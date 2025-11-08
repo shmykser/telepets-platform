@@ -102,7 +102,6 @@ class PetSummaryService:
 
     @classmethod
     def serialize_pet(cls, pet: Pet, base_url: Optional[str] = None) -> Dict[str, Any]:
-        base = cls._normalise_base_url(base_url)
         time_to_next_stage = cls.calculate_time_to_next_stage(pet) if pet.status == PetLifeStatus.alive else 0
 
         try:
@@ -127,7 +126,7 @@ class PetSummaryService:
             "updated_at": cls._format_datetime(pet.updated_at) or cls._format_datetime(pet.created_at),
             "creature": creature,
             "prompts": prompts,
-            "image_url": get_pet_image_api_url(pet.user_id, pet.name, base),
+            "image_url": cls.build_image_url(pet, base_url),
         }
 
     @staticmethod
@@ -135,6 +134,24 @@ class PetSummaryService:
         if base_url:
             return base_url.rstrip("/")
         return API_BASE_URL.rstrip("/")
+
+    @classmethod
+    def _image_version(cls, pet: Pet) -> int:
+        reference = cls._normalise_datetime(pet.updated_at) or cls._normalise_datetime(pet.created_at)
+        if reference is None:
+            return 0
+        try:
+            return int(reference.timestamp())
+        except Exception:
+            return 0
+
+    @classmethod
+    def build_image_url(cls, pet: Pet, base_url: Optional[str] = None) -> str:
+        base = cls._normalise_base_url(base_url)
+        endpoint = get_pet_image_api_url(pet.user_id, pet.name, base)
+        version = cls._image_version(pet)
+        stage = pet.state.value
+        return f"{endpoint}?stage={stage}&v={version}"
 
     @classmethod
     def empty_summary(cls, user_id: str, wallet: Optional[WalletModel] = None) -> Dict[str, Any]:

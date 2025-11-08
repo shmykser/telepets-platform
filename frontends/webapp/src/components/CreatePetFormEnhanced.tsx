@@ -50,8 +50,8 @@ export default function CreatePetFormEnhanced({
   const showPaid = isValid && requiredCost > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="mb-6">
+    <div className="space-y-7 px-4 sm:px-6 lg:px-8 pb-4 pt-2">
+      <div className="mb-4">
         <h3 className="text-2xl font-black text-white">Создать нового питомца</h3>
       </div>
       
@@ -89,12 +89,12 @@ export default function CreatePetFormEnhanced({
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-4 pt-2">
         <Button
           onClick={() => onCreate()}
-          disabled={disabled}
+          disabled={disabled || isCreating}
           loading={isCreating}
-          className="flex-1 flex-col py-4"
+          className="flex-1 flex-col py-4 min-h-[56px]"
           icon={<Sparkles className="w-5 h-5" />}
         >
           <span className="text-base font-bold">Создать</span>
@@ -108,7 +108,7 @@ export default function CreatePetFormEnhanced({
         <Button
           onClick={onCancel}
           variant="secondary"
-          className="flex-1"
+          className="flex-1 min-h-[56px] text-base font-semibold"
         >
           Отмена
         </Button>

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { petApi, economyApi } from '@/lib/api'
 import { getStoredUserId } from '@/utils'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePetWebSocket } from './usePetWebSocket'
 import { notifySuccess, notifyError } from '@/components/Notification'
 
@@ -9,6 +9,7 @@ export function usePet() {
   const queryClient = useQueryClient()
   const userId = useMemo(() => getStoredUserId(), [])
   const { isConnected: isWebSocketConnected } = usePetWebSocket()
+  const [isResurrecting, setIsResurrecting] = useState(false)
 
   const {
     data: pet,
@@ -145,6 +146,7 @@ export function usePet() {
     resurrect: async (petName: string) => {
       const userIdLocal = userId
       try {
+        setIsResurrecting(true)
         const data = await economyApi.resurrectPet(userIdLocal, petName)
         // Обновляем allPets и wallet
         queryClient.setQueryData({ queryKey: ['allPets', userIdLocal] }, (oldData: any) => {
@@ -161,11 +163,14 @@ export function usePet() {
         notifySuccess('Питомец воскрешен')
       } catch (e: any) {
         notifyError(e?.response?.data?.detail || e?.message || 'Ошибка воскрешения')
+      } finally {
+        setIsResurrecting(false)
       }
     },
     isCreating: createPetMutation.isPending,
     isHealthUpLoading: healthUpMutation.isPending,
     isHealthUpWithCostLoading: healthUpWithCostMutation.isPending,
+    isResurrecting,
   }
 }
 

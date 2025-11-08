@@ -9,7 +9,10 @@ from sqlalchemy.future import select
 from core.db import get_db
 from models import Pet, PetState, PetLifeStatus, User, Wallet, Transaction
 from services.economy import EconomyService
+from services.cache_service import CacheService
+from services.pet_summary import PetSummaryService
 from config.settings import ACTION_COSTS, PURCHASE_OPTIONS, GAME_REWARD_ALLOWED_GAMES, GAME_REWARD_COINS_PER_SCORE, GAME_REWARD_MAX_PER_REQUEST
+from api.websocket import broadcast_pet_update, broadcast_wallet_update
 import logging
 from typing import Dict, List
 
@@ -133,13 +136,45 @@ async def purchase_coins(
             description=f"Покупка {coins} монет за ${price}",
             source="purchase"
         )
+
+        wallet = await EconomyService.get_wallet(db, user_id)
+
+        pets_payload = None
+        try:
+            invalidated = await CacheService.invalidate_user(user_id, pets=False, summary=True, wallet=True)
+            if not invalidated:
+                logger.debug("Инвалидация кеша после purchase вернула False для пользователя %s", user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.warning(f"Ошибка инвалидации кеша после purchase: {cache_error}")
+
+        try:
+            pets_payload = await PetSummaryService.build_all_pets_summary(db, user_id)
+        except Exception as summary_error:  # noqa: BLE001
+            logger.warning(f"Ошибка формирования summary после purchase: {summary_error}")
+
+        try:
+            if wallet:
+                await broadcast_wallet_update(user_id, {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent,
+                })
+            if pets_payload is not None:
+                await broadcast_pet_update(user_id, "pets_update", pets_payload)
+        except Exception as ws_error:
+            logger.warning(f"Ошибка отправки WebSocket события после purchase: {ws_error}")
         
         return {
             "success": True,
             "user_id": user_id,
             "coins_added": coins,
             "price_usd": price,
-            "package_id": package_id
+            "package_id": package_id,
+            "wallet": {
+                "coins": wallet.coins if wallet else None,
+                "total_earned": wallet.total_earned if wallet else None,
+                "total_spent": wallet.total_spent if wallet else None,
+            }
         }
         
     except Exception as e:
@@ -189,11 +224,43 @@ async def claim_game_reward(
             source="game"
         )
 
+        wallet = await EconomyService.get_wallet(db, user_id)
+
+        pets_payload = None
+        try:
+            invalidated = await CacheService.invalidate_user(user_id, pets=False, summary=True, wallet=True)
+            if not invalidated:
+                logger.debug("Инвалидация кеша после game_reward вернула False для пользователя %s", user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.warning(f"Ошибка инвалидации кеша после game_reward: {cache_error}")
+
+        try:
+            pets_payload = await PetSummaryService.build_all_pets_summary(db, user_id)
+        except Exception as summary_error:  # noqa: BLE001
+            logger.warning(f"Ошибка формирования summary после game_reward: {summary_error}")
+
+        try:
+            if wallet:
+                await broadcast_wallet_update(user_id, {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent,
+                })
+            if pets_payload is not None:
+                await broadcast_pet_update(user_id, "pets_update", pets_payload)
+        except Exception as ws_error:
+            logger.warning(f"Ошибка отправки WebSocket события после game_reward: {ws_error}")
+
         return {
             "success": True,
             "coins_added": coins,
             "new_balance": await EconomyService.get_balance(db, user_id),
-            "message": "Награда за мини-игру начислена"
+            "message": "Награда за мини-игру начислена",
+            "wallet": {
+                "coins": wallet.coins if wallet else None,
+                "total_earned": wallet.total_earned if wallet else None,
+                "total_spent": wallet.total_spent if wallet else None,
+            }
         }
     except HTTPException:
         raise
@@ -253,7 +320,7 @@ async def health_up_with_cost(
         
         # Увеличиваем здоровье
         from api.health_up import health_up_logic
-        result = await health_up_logic(user_id, db, pet.name)
+        result = await health_up_logic(user_id, db, pet.name, wallet_changed=True)
         
         return {
             "success": True,
@@ -317,6 +384,41 @@ async def resurrect_pet(
         await db.commit()
         await db.refresh(pet)
 
+        # Инвалидируем кеши и подготавливаем данные
+        try:
+            invalidated = await CacheService.invalidate_user(user_id, pets=True, summary=True, wallet=True)
+            if not invalidated:
+                logger.debug("Инвалидация кеша после resurrection вернула False для пользователя %s", user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.warning(f"Ошибка инвалидации кеша после resurrection: {cache_error}")
+
+        pets_payload = None
+        try:
+            pets_payload = await PetSummaryService.build_all_pets_summary(db, user_id)
+        except Exception as summary_error:  # noqa: BLE001
+            logger.warning(f"Ошибка формирования summary после resurrection: {summary_error}")
+
+        wallet = await EconomyService.get_wallet(db, user_id)
+
+        # WebSocket уведомления
+        try:
+            await broadcast_pet_update(user_id, "pet_resurrected", {
+                "pet_id": pet.id,
+                "pet_name": pet.name,
+                "health": pet.health,
+                "status": pet.status.value,
+            })
+            if pets_payload is not None:
+                await broadcast_pet_update(user_id, "pets_update", pets_payload)
+            if wallet:
+                await broadcast_wallet_update(user_id, {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent,
+                })
+        except Exception as ws_error:
+            logger.warning(f"Ошибка отправки WebSocket события после resurrection: {ws_error}")
+
         return {
             "success": True,
             "coins_spent": cost,
@@ -377,12 +479,44 @@ async def claim_daily_login_reward(
             description="Ежедневная награда за вход",
             source="daily_login"
         )
+
+        wallet = await EconomyService.get_wallet(db, user_id)
+
+        pets_payload = None
+        try:
+            invalidated = await CacheService.invalidate_user(user_id, pets=False, summary=True, wallet=True)
+            if not invalidated:
+                logger.debug("Инвалидация кеша после daily_login вернула False для пользователя %s", user_id)
+        except Exception as cache_error:  # noqa: BLE001
+            logger.warning(f"Ошибка инвалидации кеша после daily_login: {cache_error}")
+
+        try:
+            pets_payload = await PetSummaryService.build_all_pets_summary(db, user_id)
+        except Exception as summary_error:  # noqa: BLE001
+            logger.warning(f"Ошибка формирования summary после daily_login: {summary_error}")
+
+        try:
+            if wallet:
+                await broadcast_wallet_update(user_id, {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent,
+                })
+            if pets_payload is not None:
+                await broadcast_pet_update(user_id, "pets_update", pets_payload)
+        except Exception as ws_error:
+            logger.warning(f"Ошибка отправки WebSocket события после daily_login: {ws_error}")
         
         return {
             "success": True,
             "reward_amount": reward_amount,
             "new_balance": await EconomyService.get_balance(db, user_id),
-            "message": "Ежедневная награда получена!"
+            "message": "Ежедневная награда получена!",
+            "wallet": {
+                "coins": wallet.coins if wallet else None,
+                "total_earned": wallet.total_earned if wallet else None,
+                "total_spent": wallet.total_spent if wallet else None,
+            }
         }
         
     except HTTPException:

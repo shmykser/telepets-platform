@@ -6,6 +6,8 @@ from services.auction import AuctionService
 from services.stages import StageLifecycleService
 from services.cache_service import CacheService
 from services.pet_summary import PetSummaryService
+from services.cache_service import CacheService
+from services.pet_summary import PetSummaryService
 from config.settings import (
     HEALTH_DOWN_INTERVALS, 
     HEALTH_DOWN_AMOUNTS, 
@@ -97,6 +99,32 @@ async def decrease_health_task():
                                 await StageLifecycleService.wipe_images_on_death(db, pet)
                             except Exception:
                                 pass
+
+                            # Инвалидируем кеши и оповещаем фронтенд
+                            try:
+                                invalidated = await CacheService.invalidate_user(
+                                    pet.user_id,
+                                    pets=True,
+                                    summary=True,
+                                    wallet=False,
+                                )
+                                if not invalidated:
+                                    logger.debug("Инвалидация кеша после смерти вернула False для пользователя %s", pet.user_id)
+                            except Exception as cache_error:  # noqa: BLE001
+                                logger.warning(f"Ошибка инвалидации кеша после смерти питомца: {cache_error}")
+
+                            try:
+                                from api.websocket import broadcast_pet_update
+
+                                pets_data = await PetSummaryService.build_all_pets_summary(db, pet.user_id)
+                                await broadcast_pet_update(pet.user_id, "pet_died", {
+                                    "pet_id": pet.id,
+                                    "pet_name": pet.name,
+                                    "stage": stage_before_death,
+                                })
+                                await broadcast_pet_update(pet.user_id, "pets_update", pets_data)
+                            except Exception as ws_error:
+                                logger.warning(f"Ошибка отправки WebSocket обновления при смерти питомца: {ws_error}")
                         
                         # Проверяем низкое здоровье
                         elif pet.health <= HEALTH_LOW:

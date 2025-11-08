@@ -131,7 +131,7 @@ export default function StackAndText({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex flex-col lg:flex-row items-stretch justify-center gap-2 lg:gap-3 h-full w-full">
+      <div className="flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-4 lg:gap-3 h-full w-full">
         {/* Stack Component - 60% ширины */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -155,17 +155,19 @@ export default function StackAndText({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="w-full lg:w-[40%] lg:flex-[0.4] px-3 pb-3 flex flex-col"
+          className="w-full lg:w-[40%] lg:flex-[0.4] px-4 pb-4 flex flex-col items-center"
         >
-          <GlassmorphismTextWindow
-            text={text}
-            title={title}
-            typingSpeed={typingSpeed}
-            pauseDuration={2000}
-            showCursor={true}
-            loop={true}
-            className="h-full"
-          />
+          <div className="w-full max-w-[540px]">
+            <GlassmorphismTextWindow
+              text={text}
+              title={title}
+              typingSpeed={typingSpeed}
+              pauseDuration={2000}
+              showCursor={true}
+              loop={true}
+              className="h-full"
+            />
+          </div>
         </motion.div>
       </div>
 

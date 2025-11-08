@@ -5,6 +5,8 @@ from core.db import get_db
 from models import Pet, PetState, PetLifeStatus
 from config.settings import HEALTH_MAX, HEALTH_UP_AMOUNTS, STAGE_MESSAGES, HEALTH_MIN
 from services.cache_service import CacheService
+from services.economy import EconomyService
+from api.websocket import broadcast_pet_update, broadcast_wallet_update
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,7 +15,13 @@ from api.schemas.common import HealthUpResponse, ErrorResponse
 
 router = APIRouter(prefix="/health_up", tags=["pet"])
 
-async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None = None) -> dict:
+async def health_up_logic(
+    user_id: str,
+    db: AsyncSession,
+    pet_name: str | None = None,
+    *,
+    wallet_changed: bool = False,
+) -> dict:
     """
     Логика увеличения здоровья питомца.
     Используется как в обычном API, так и в экономике.
@@ -56,7 +64,12 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
     
     # Инвалидируем кеш после изменения
     try:
-        invalidated = await CacheService.invalidate_user(user_id, pets=True, summary=True)
+        invalidated = await CacheService.invalidate_user(
+            user_id,
+            pets=True,
+            summary=True,
+            wallet=wallet_changed,
+        )
         if not invalidated:
             logger.debug("Инвалидация кеша после health_up вернула False для пользователя %s", user_id)
     except Exception as e:  # noqa: BLE001
@@ -64,7 +77,6 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
     
     # Отправляем обновление через WebSocket
     try:
-        from api.websocket import broadcast_pet_update
         await broadcast_pet_update(user_id, "health_changed", {
             "pet_id": pet.id,
             "pet_name": pet.name,
@@ -72,6 +84,14 @@ async def health_up_logic(user_id: str, db: AsyncSession, pet_name: str | None =
             "health_increased": pet.health - old_health,
             "stage": pet.state.value,
         })
+        if wallet_changed:
+            wallet = await EconomyService.get_wallet(db, user_id)
+            if wallet:
+                await broadcast_wallet_update(user_id, {
+                    "coins": wallet.coins,
+                    "total_earned": wallet.total_earned,
+                    "total_spent": wallet.total_spent,
+                })
     except Exception as e:
         logger.warning(f"Ошибка отправки WebSocket обновления: {e}")
     

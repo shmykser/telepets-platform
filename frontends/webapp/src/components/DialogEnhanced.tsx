@@ -169,7 +169,7 @@ export default function DialogEnhanced({
                     {fullWidth && (
                       <motion.button
                         onClick={onClose}
-                        className="absolute top-4 right-4 z-50 p-2 hover:bg-white/10 rounded-lg transition-colors bg-white/5 backdrop-blur-md border border-white/20"
+                        className="absolute top-4 right-4 z-50 p-2 hover:bg-white/10 rounded-lg transition-colors bg-white/5 backdrop-blur-md border border-white/20 flex items-center justify-center"
                         style={isTelegramWebApp() ? {
                           top: `${16 + (contentSafeAreaInset.top || 0)}px`,
                           right: `${16 + (contentSafeAreaInset.right || 0)}px`,
@@ -192,7 +192,7 @@ export default function DialogEnhanced({
                             )}
                             <motion.button
                               onClick={onClose}
-                              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center justify-center"
                               whileHover={{ scale: 1.1, rotate: 90 }}
                               whileTap={{ scale: 0.9 }}
                             >
@@ -216,7 +216,7 @@ export default function DialogEnhanced({
                         {title && <h2 className="text-xl font-bold text-white">{title}</h2>}
                         <button
                           onClick={onClose}
-                          className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                          className="p-2 hover:bg-white/5 rounded-lg transition-colors flex items-center justify-center"
                         >
                           <X className="w-5 h-5 text-gray-400" />
                         </button>
@@ -236,7 +236,7 @@ export default function DialogEnhanced({
                         {title && <h2 className="text-xl font-bold text-white">{title}</h2>}
                         <button
                           onClick={onClose}
-                          className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                          className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors flex items-center justify-center"
                         >
                           <X className="w-5 h-5 text-gray-400" />
                         </button>
