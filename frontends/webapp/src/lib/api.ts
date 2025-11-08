@@ -4,7 +4,7 @@ import type {
   Wallet, 
   Transaction,
   UserStats,
-  ActionCosts,
+  ActionCostsResponse,
   PetSummary,
   HealthUpResponse,
   CreatePetResponse,
@@ -13,6 +13,7 @@ import type {
   UserProfile,
   UpdateProfileRequest,
   PublicUserInfo,
+  TimerSummary,
 } from '@/types'
 import { buildUrl } from '@/config/endpoints'
 import { getStoredUsername } from '@/utils'
@@ -165,8 +166,8 @@ export const economyApi = {
     return response.data
   },
 
-  getActionCosts: async (): Promise<ActionCosts> => {
-    const response = await api.get<ActionCosts>('/economy/actions/costs')
+  getActionCosts: async (): Promise<ActionCostsResponse> => {
+    const response = await api.get<ActionCostsResponse>('/economy/actions/costs')
     return response.data
   },
 
@@ -207,6 +208,13 @@ export const economyApi = {
     const response = await api.post(`/economy/games/${encodeURIComponent(user_id)}/claim`, null, {
       params: { game, score }
     })
+    return response.data
+  },
+}
+
+export const timerApi = {
+  getTimers: async (user_id: string): Promise<TimerSummary> => {
+    const response = await api.get<TimerSummary>(`/timers/${encodeURIComponent(user_id)}`)
     return response.data
   },
 }

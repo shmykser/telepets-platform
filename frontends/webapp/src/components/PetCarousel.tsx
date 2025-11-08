@@ -2,7 +2,10 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import React from 'react';
-import type { Pet } from '@/types';
+import { Clock } from 'lucide-react';
+import type { Pet, StageCostMap, SyncTimer } from '@/types';
+import useSyncedCountdown from '@/hooks/useSyncedCountdown';
+import { formatCountdown } from '@/utils';
 
 export interface PetCarouselProps {
   pets?: Pet[];
@@ -13,7 +16,10 @@ export interface PetCarouselProps {
   onResurrect?: (pet: Pet) => void;
   onImageClick?: (pet: Pet) => void;
   wallet?: { coins: number };
-  resurrectCost?: number;
+  healthUpCosts?: StageCostMap;
+  resurrectCosts?: StageCostMap;
+  stageTimers?: Record<string, SyncTimer>;
+  serverTime?: string;
   baseWidth?: number;
   cardHeight?: number;
   autoplay?: boolean;
@@ -52,7 +58,10 @@ interface PetCardProps {
   onResurrect?: (pet: Pet) => void;
   onImageClick?: (pet: Pet) => void;
   wallet?: { coins: number };
-  resurrectCost: number;
+  healthUpCosts?: StageCostMap;
+  resurrectCosts?: StageCostMap;
+  stageTimer?: SyncTimer;
+  serverTime?: string;
   effectiveTransition: any;
   isHealthUpLoading: boolean;
   isHealthUpWithCostLoading: boolean;
@@ -76,7 +85,10 @@ const PetCard = React.memo(({
   onResurrect,
   onImageClick,
   wallet,
-  resurrectCost,
+  healthUpCosts,
+  resurrectCosts,
+  stageTimer,
+  serverTime,
   effectiveTransition,
   isHealthUpLoading,
   isHealthUpWithCostLoading,
@@ -135,6 +147,45 @@ const PetCard = React.memo(({
 
   const stageInfo = getStageInfo(pet.state);
   const healthStatus = getHealthStatus();
+  const stageKey = pet.state ?? '';
+  const walletCoins = typeof wallet?.coins === 'number' ? wallet.coins : undefined;
+  const paidHealthUpCost =
+    stageKey && typeof healthUpCosts?.[stageKey] === 'number'
+      ? healthUpCosts[stageKey]
+      : undefined;
+  const canPayPaidAction =
+    paidHealthUpCost === undefined
+      ? true
+      : walletCoins === undefined
+        ? true
+        : walletCoins >= paidHealthUpCost;
+  const paidCostLabel = paidHealthUpCost !== undefined ? `${paidHealthUpCost} монет` : '—';
+  const stageResurrectCost =
+    stageKey && typeof resurrectCosts?.[stageKey] === 'number'
+      ? resurrectCosts[stageKey]
+      : undefined;
+  const effectiveResurrectCost = typeof stageResurrectCost === 'number' ? stageResurrectCost : 0;
+  const canResurrect = walletCoins !== undefined ? walletCoins >= effectiveResurrectCost : true;
+  const resurrectCostLabel =
+    typeof stageResurrectCost === 'number' ? `${stageResurrectCost} монет` : '—';
+  const stageTimerMeta = stageTimer && typeof stageTimer.meta === 'object'
+    ? (stageTimer.meta as Record<string, any>)
+    : undefined;
+  const nextStageKey = typeof stageTimerMeta?.next_stage === 'string' ? stageTimerMeta.next_stage : undefined;
+  const nextStageInfo = nextStageKey ? getStageInfo(nextStageKey) : undefined;
+  const stageTimerLabel = nextStageInfo?.name ? `До стадии ${nextStageInfo.name}` : 'До завершения стадии';
+  const stageCountdown = useSyncedCountdown({
+    targetAt: stageTimer?.ends_at ?? stageTimer?.available_at,
+    initialRemainingSeconds: stageTimer?.remaining_seconds,
+    serverTime,
+  });
+  const stageTimerReady = !stageTimer || stageTimer?.status === 'completed' || stageCountdown.isCompleted;
+  const stageTimerDisplay = stageTimer
+    ? stageTimerReady
+      ? (nextStageInfo ? 'Готов к переходу' : 'Готово')
+      : formatCountdown(stageCountdown.secondsLeft)
+    : null;
+  const showStageTimerBadge = Boolean(!isDead && stageTimer && (stageTimerDisplay || stageTimerReady));
 
   const triggerActionFeedback = useCallback(
     (action: 'free' | 'paid' | 'play' | 'resurrect', cb?: () => void, autoReleaseMs?: number) => {
@@ -190,8 +241,6 @@ const PetCard = React.memo(({
   const isPaidBusy = isPaidPending || isHealthUpWithCostLoading;
   const isResurrectBusy = isResurrectPending || isResurrecting;
   const isPlayBusy = isPlayPending;
-  const canResurrect = !!wallet && wallet.coins >= resurrectCost;
-
   const renderSpinner = () => (
     <motion.span
       className="relative z-10 flex items-center justify-center"
@@ -203,14 +252,24 @@ const PetCard = React.memo(({
     </motion.span>
   );
 
-  const withPressOverlay = (action: 'free' | 'paid' | 'play' | 'resurrect', active: boolean) => (
-    <motion.div
-      className="absolute inset-0 bg-white/25"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: active ? 0.18 : 0 }}
-      transition={{ duration: 0.18 }}
-    />
-  );
+  const withPressOverlay = (action: 'free' | 'paid' | 'play' | 'resurrect', active: boolean) => {
+    const overlayByAction: Record<'free' | 'paid' | 'play' | 'resurrect', string> = {
+      free: 'bg-emerald-300/30',
+      paid: 'bg-amber-300/30',
+      play: 'bg-sky-300/30',
+      resurrect: 'bg-rose-300/30',
+    };
+    const overlayClass = overlayByAction[action] ?? 'bg-white/25';
+
+    return (
+      <motion.div
+        className={`absolute inset-0 ${overlayClass}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: active ? 0.24 : 0 }}
+        transition={{ duration: 0.18 }}
+      />
+    );
+  };
 
   return (
     <motion.div
@@ -312,6 +371,31 @@ const PetCard = React.memo(({
             {stageInfo.emoji}
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          {showStageTimerBadge && (
+            <div
+              className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-center"
+              style={{
+                transform: 'translateZ(80px)',
+                filter: 'drop-shadow(0 30px 60px rgba(0, 0, 0, 0.9))',
+                zIndex: 20
+              }}
+            >
+              <div
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/20 bg-black/45 backdrop-blur-md"
+                style={{
+                  boxShadow: '0 15px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                <Clock className="w-3 h-3 text-amber-200" />
+                <span className="text-[8px] uppercase tracking-[0.12em] text-gray-200">
+                  {stageTimerLabel}
+                </span>
+                <span className={`text-[11px] font-semibold ${stageTimerReady ? 'text-emerald-200' : 'text-white'}`}>
+                  {stageTimerDisplay}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="absolute top-[65%] left-0 right-0 bottom-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-0.5 sm:pb-1 bg-gradient-to-t from-gray-900 via-gray-900/95 to-transparent flex flex-col justify-start rounded-b-3xl">
@@ -370,8 +454,8 @@ const PetCard = React.memo(({
                 renderSpinner()
               ) : (
                 <>
-                  <span className="relative z-10">Воскресить питомца</span>
-                  <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCost} монет</span>
+              <span className="relative z-10">Воскресить питомца</span>
+              <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCostLabel}</span>
                 </>
               )}
             </motion.button>
@@ -414,16 +498,18 @@ const PetCard = React.memo(({
                 transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 0.5 }}
                 whileHover={!isPaidBusy ? { scale: 1.06 } : {}}
                 whileTap={!isPaidBusy ? { scale: 0.92 } : {}}
-                disabled={isPaidBusy}
+                disabled={isPaidBusy || !canPayPaidAction}
                 onClick={(e) => {
                   e.stopPropagation();
-                  triggerActionFeedback('paid', () => onHealthUpWithCost?.(pet));
+                  if (!isPaidBusy && canPayPaidAction) {
+                    triggerActionFeedback('paid', () => onHealthUpWithCost?.(pet));
+                  }
                 }}
                 aria-pressed={isPaidPending}
                 aria-busy={isPaidBusy}
               >
                 {withPressOverlay('paid', isPaidPending)}
-                {isPaidBusy ? renderSpinner() : <span className="relative z-10">10 монет</span>}
+                {isPaidBusy ? renderSpinner() : <span className="relative z-10">{paidCostLabel}</span>}
               </motion.button>
               <motion.button
                 className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
@@ -531,12 +617,22 @@ const PetCard = React.memo(({
   const heightUnchanged = prevProps.adaptiveCardHeight === nextProps.adaptiveCardHeight;
   const offsetUnchanged = prevProps.trackItemOffset === nextProps.trackItemOffset;
   const hoveredUnchanged = prevProps.hoveredCardId === nextProps.hoveredCardId;
+  const costsUnchanged =
+    prevProps.healthUpCosts === nextProps.healthUpCosts &&
+    prevProps.resurrectCosts === nextProps.resurrectCosts;
+  const stageTimerUnchanged =
+    (!!prevProps.stageTimer === !!nextProps.stageTimer) &&
+    prevProps.stageTimer?.id === nextProps.stageTimer?.id &&
+    prevProps.stageTimer?.status === nextProps.stageTimer?.status &&
+    prevProps.stageTimer?.remaining_seconds === nextProps.stageTimer?.remaining_seconds &&
+    prevProps.stageTimer?.available_at === nextProps.stageTimer?.available_at &&
+    prevProps.serverTime === nextProps.serverTime;
   const loadingUnchanged =
     prevProps.isHealthUpLoading === nextProps.isHealthUpLoading &&
     prevProps.isHealthUpWithCostLoading === nextProps.isHealthUpWithCostLoading &&
     prevProps.isResurrecting === nextProps.isResurrecting;
   
-  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged && loadingUnchanged;
+  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged && costsUnchanged && stageTimerUnchanged && loadingUnchanged;
 });
 
 export default function PetCarousel({
@@ -548,7 +644,10 @@ export default function PetCarousel({
   onResurrect,
   onImageClick,
   wallet,
-  resurrectCost = 500,
+  healthUpCosts,
+  resurrectCosts,
+  stageTimers,
+  serverTime,
   baseWidth = 380,
   cardHeight = 500,
   autoplay = false,
@@ -685,31 +784,39 @@ export default function PetCarousel({
           transition={effectiveTransition}
           onAnimationComplete={handleAnimationComplete}
         >
-        {carouselItems.map((pet, index) => (
-          <PetCard
-            key={pet.id ?? pet.name ?? index}
-            pet={pet}
-            index={index}
-            itemWidth={itemWidth}
-            adaptiveCardHeight={cardHeight}
-            trackItemOffset={trackItemOffset}
-            x={x}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={setHoveredCardId}
-            onPetSelect={onPetSelect}
-            onHealthUp={onHealthUp}
-            onHealthUpWithCost={onHealthUpWithCost}
-            onPlay={onPlay}
-            onResurrect={onResurrect}
-            onImageClick={onImageClick}
-            wallet={wallet}
-            resurrectCost={resurrectCost}
-            effectiveTransition={effectiveTransition}
-            isHealthUpLoading={isHealthUpLoading ?? false}
-            isHealthUpWithCostLoading={isHealthUpWithCostLoading ?? false}
-            isResurrecting={isResurrecting ?? false}
-          />
-        ))}
+        {carouselItems.map((pet, index) => {
+          const petKey = pet?.id != null ? String(pet.id) : pet?.name ?? String(index);
+          const stageTimer = stageTimers ? stageTimers[petKey] : undefined;
+
+          return (
+            <PetCard
+              key={pet.id ?? pet.name ?? index}
+              pet={pet}
+              index={index}
+              itemWidth={itemWidth}
+              adaptiveCardHeight={cardHeight}
+              trackItemOffset={trackItemOffset}
+              x={x}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={setHoveredCardId}
+              onPetSelect={onPetSelect}
+              onHealthUp={onHealthUp}
+              onHealthUpWithCost={onHealthUpWithCost}
+              onPlay={onPlay}
+              onResurrect={onResurrect}
+              onImageClick={onImageClick}
+              wallet={wallet}
+              healthUpCosts={healthUpCosts}
+              resurrectCosts={resurrectCosts}
+              stageTimer={stageTimer}
+              serverTime={serverTime}
+              effectiveTransition={effectiveTransition}
+              isHealthUpLoading={isHealthUpLoading ?? false}
+              isHealthUpWithCostLoading={isHealthUpWithCostLoading ?? false}
+              isResurrecting={isResurrecting ?? false}
+            />
+          )
+        })}
         </motion.div>
       </div>
       

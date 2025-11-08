@@ -1,8 +1,10 @@
+export type PetStage = 'egg' | 'baby' | 'adult'
+
 export interface Pet {
   id?: number | string
   user_id?: string
   name?: string
-  state?: 'egg' | 'baby' | 'adult'
+  state?: PetStage
   health?: number
   status?: 'alive' | 'dead' | 'no_pets' | 'all_dead' | 'success'
   next_stage?: string
@@ -81,10 +83,23 @@ export interface UserStats {
   total_transactions: number
 }
 
-export interface ActionCosts {
-  paid_pet: number
-  health_up: number
-  resurrect: number
+export type StageCostMap = Record<string, number>
+
+export interface ActionCostConfig {
+  health_up: StageCostMap
+  [key: string]: number | StageCostMap
+}
+
+export interface PurchaseOption {
+  coins: number
+  price_usd: number
+}
+
+export type PurchaseOptionsMap = Record<string, PurchaseOption>
+
+export interface ActionCostsResponse {
+  action_costs: ActionCostConfig
+  purchase_options: PurchaseOptionsMap
 }
 
 export interface Auction {
@@ -128,5 +143,25 @@ export interface PublicUserInfo {
   display_name: string
   total_pets: number
   created_at: string
+}
+
+export type TimerStatus = 'running' | 'cooldown' | 'ready' | 'completed' | 'idle'
+
+export interface SyncTimer {
+  id: string
+  type: string
+  label: string
+  status: TimerStatus
+  remaining_seconds: number
+  duration_seconds?: number
+  starts_at?: string
+  ends_at?: string
+  available_at?: string
+  meta?: Record<string, unknown>
+}
+
+export interface TimerSummary {
+  server_time: string
+  timers: SyncTimer[]
 }
 

@@ -31,15 +31,30 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
         except Exception as e:
             raise HTTPException(status_code=422, detail=str(e))
 
-        # Ищем всех живых питомцев
-        result = await db.execute(
-            select(Pet).where(Pet.user_id == user_id, Pet.status == PetLifeStatus.alive)
+        # Загружаем всех питомцев пользователя
+        pets_result = await db.execute(
+            select(Pet).where(Pet.user_id == user_id)
         )
-        alive_pets = result.scalars().all()
+        pets = pets_result.scalars().all()
+        alive_pets = [p for p in pets if p.status == PetLifeStatus.alive]
+        dead_pets = [p for p in pets if p.status == PetLifeStatus.dead]
 
-        # Логика оплаты: если есть живые и среди них есть не-adult → создание платное
-        non_adult_alive = [p for p in alive_pets if p.state != PetState.adult]
-        is_paid_creation_required = len(alive_pets) > 0 and len(non_adult_alive) > 0
+        # Логика оплаты создания питомца
+        create_costs = ACTION_COSTS.get('create_pet', {})
+        if len(pets) == 0:
+            creation_cost_tier = 'first_pet'
+            paid_cost = create_costs.get('first_pet', 0)
+        elif alive_pets:
+            creation_cost_tier = 'has_alive'
+            paid_cost = create_costs.get('has_alive', create_costs.get('default', 500))
+        elif dead_pets:
+            creation_cost_tier = 'all_dead'
+            paid_cost = create_costs.get('all_dead', create_costs.get('default', 0))
+        else:
+            creation_cost_tier = 'unknown'
+            paid_cost = 0
+
+        is_paid_creation_required = paid_cost > 0
 
         # Уникальность имени в рамках пользователя
         same_name = await db.execute(
@@ -51,12 +66,12 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
         # Создаем кошелек для пользователя (если его нет)
         wallet = await EconomyService.create_user_wallet(db, user_id)
 
-        # Определяем стоимость создания питомца (если требуется)
-        paid_cost = ACTION_COSTS.get('paid_pet', 500) if is_paid_creation_required else 0
-
         # Если требуется платное создание — списываем монеты
         if is_paid_creation_required:
-            logger.info(f"💰 Платное создание питомца: user_id={user_id}, name={name}, cost={paid_cost}, wallet.coins={wallet.coins}")
+            logger.info(
+                "💰 Платное создание питомца: user_id=%s, name=%s, cost=%s, wallet.coins=%s, tier=%s",
+                user_id, name, paid_cost, wallet.coins, creation_cost_tier
+            )
             # Проверяем достаточность средств
             if wallet.coins < paid_cost:
                 raise HTTPException(status_code=400, detail=f"Недостаточно монет для создания питомца. Требуется: {paid_cost}, доступно: {wallet.coins}")
@@ -66,7 +81,7 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
                     user_id=user_id,
                     amount=paid_cost,
                     description=f"Платное создание нового питомца ({name})",
-                    transaction_data={"action": "create_pet", "pet_name": name}
+                    transaction_data={"action": "create_pet", "pet_name": name, "tier": creation_cost_tier}
                 )
                 if not spent:
                     logger.error(f"❌ spend_coins вернул False для user_id={user_id}, name={name}")
@@ -172,7 +187,8 @@ async def create_pet(user_id: str, name: str, override: bool = False, request: R
                     "total_spent": wallet.total_spent
                 },
                 "paid": is_paid_creation_required,
-                "paid_cost": paid_cost
+                "paid_cost": paid_cost,
+                "creation_cost_tier": creation_cost_tier
             }
         except Exception as e:
             logger.error(f"❌ Ошибка при формировании ответа: user_id={user_id}, name={name}, error={e}", exc_info=True)

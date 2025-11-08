@@ -11,7 +11,7 @@ from models import Pet, PetState, PetLifeStatus, User, Wallet, Transaction
 from services.economy import EconomyService
 from services.cache_service import CacheService
 from services.pet_summary import PetSummaryService
-from config.settings import ACTION_COSTS, PURCHASE_OPTIONS, GAME_REWARD_ALLOWED_GAMES, GAME_REWARD_COINS_PER_SCORE, GAME_REWARD_MAX_PER_REQUEST
+from config.settings import ACTION_COSTS, PURCHASE_OPTIONS, GAME_REWARD_ALLOWED_GAMES, GAME_REWARD_COINS_PER_SCORE, GAME_REWARD_MAX_PER_REQUEST, ACTION_REWARDS
 from api.websocket import broadcast_pet_update, broadcast_wallet_update
 import logging
 from typing import Dict, List
@@ -19,6 +19,7 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 from api.schemas.economy import WalletSchema, TransactionsResponse, HealthUpWithCostResponse
+from services.timer import TimerService
 
 router = APIRouter(prefix="/economy", tags=["economy"])
 
@@ -357,10 +358,13 @@ async def resurrect_pet(
 
         # Стоимость
         from config.settings import HEALTH_MAX
-        cost = ACTION_COSTS.get('resurrect', 500)
+        pet_stage = pet.state.value if isinstance(pet.state, PetState) else getattr(pet.state, "value", None)
+        stage_key = pet_stage or (pet.state if isinstance(pet.state, str) else None)
+
+        cost = await EconomyService.get_action_cost('resurrect', stage_key)
 
         # Проверяем баланс
-        can_afford = await EconomyService.can_afford_action(db, user_id, 'resurrect')
+        can_afford = await EconomyService.can_afford_action(db, user_id, 'resurrect', stage_key)
         if not can_afford:
             wallet = await EconomyService.get_wallet(db, user_id)
             raise HTTPException(status_code=400, detail=f"Недостаточно монет. Требуется: {cost}, доступно: {wallet.coins if wallet else 0}")
@@ -370,8 +374,8 @@ async def resurrect_pet(
             db=db,
             user_id=user_id,
             amount=cost,
-            description=f"Воскрешение питомца {pet.name} (стадия: {pet.state.value})",
-            transaction_data={"pet_id": pet.id, "action": "resurrect", "stage": pet.state.value}
+            description=f"Воскрешение питомца {pet.name} (стадия: {stage_key or 'unknown'})",
+            transaction_data={"pet_id": pet.id, "action": "resurrect", "stage": stage_key}
         )
         if not spent:
             raise HTTPException(status_code=500, detail="Не удалось списать монеты за воскрешение")
@@ -452,33 +456,46 @@ async def claim_daily_login_reward(
     Получение ежедневной награды за вход.
     """
     try:
-        # Проверяем, получал ли пользователь награду сегодня
-        from datetime import datetime, timedelta
-        today = datetime.utcnow().date()
-        
-        # Проверяем последнюю транзакцию ежедневной награды
-        result = await db.execute(
-            select(Transaction)
-            .where(
-                Transaction.user_id == user_id,
-                Transaction.description.like("%ежедневная награда%"),
-                Transaction.created_at >= today
-            )
-            .order_by(Transaction.created_at.desc())
-        )
-        
-        if result.scalar_one_or_none():
+        try:
+            timer = await TimerService.ensure_daily_login_available(db, user_id)
+        except PermissionError:
             raise HTTPException(status_code=400, detail="Ежедневная награда уже получена сегодня")
         
-        # Выдаем награду
-        reward_amount = 5  # Из настроек
-        await EconomyService.add_coins(
+        metadata = timer.metadata if isinstance(timer.metadata, dict) else {}
+        base_amount = metadata.get("base_amount") or ACTION_REWARDS.get("daily_login", 5)
+        next_multiplier = metadata.get("next_multiplier") or 1
+        try:
+            base_amount = max(int(base_amount), 0)
+        except (TypeError, ValueError):
+            base_amount = ACTION_REWARDS.get("daily_login", 5)
+        try:
+            next_multiplier = max(int(next_multiplier), 1)
+        except (TypeError, ValueError):
+            next_multiplier = 1
+        reward_amount = metadata.get("next_reward_amount") or (base_amount * next_multiplier)
+        try:
+            reward_amount = max(int(reward_amount), 0)
+        except (TypeError, ValueError):
+            reward_amount = base_amount * next_multiplier
+
+        try:
+            await EconomyService.add_coins(
             db=db,
             user_id=user_id,
             amount=reward_amount,
-            description="Ежедневная награда за вход",
-            source="daily_login"
+            description=TimerService.DAILY_LOGIN_DESCRIPTION,
+            source="daily_login",
+            transaction_data={
+                "streak": min(int(next_multiplier), TimerService.MAX_DAILY_STREAK),
+                "base_amount": base_amount,
+            }
         )
+        except Exception as add_error:  # noqa: BLE001
+            logger.error("Не удалось начислить ежедневную награду: %s", add_error, exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Не удалось начислить награду ({add_error}). Свяжитесь с поддержкой."
+            ) from add_error
 
         wallet = await EconomyService.get_wallet(db, user_id)
 
@@ -510,6 +527,7 @@ async def claim_daily_login_reward(
         return {
             "success": True,
             "reward_amount": reward_amount,
+            "streak": min(int(next_multiplier), TimerService.MAX_DAILY_STREAK),
             "new_balance": await EconomyService.get_balance(db, user_id),
             "message": "Ежедневная награда получена!",
             "wallet": {
@@ -522,5 +540,5 @@ async def claim_daily_login_reward(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения ежедневной награды: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения награды") 
+        logger.error("Ошибка получения ежедневной награды: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка получения награды: {e}")

@@ -1,5 +1,7 @@
-import { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useAllPets, usePet } from '@/hooks/usePet';
+import { useTimers } from '@/hooks/useTimers';
+import { useActionCosts } from '@/hooks/useEconomy';
 import PetCarousel from '@/components/PetCarousel';
 import QuickStatsVariants from '@/components/QuickStatsVariants';
 import CreatePetFormEnhanced from '@/components/CreatePetFormEnhanced';
@@ -47,6 +49,12 @@ export default function Home() {
     isResurrecting
   } = usePet();
   const userId = useMemo(() => getStoredUserId(), []);
+  const { healthUpCosts, resurrectCosts, createPetCosts } = useActionCosts();
+  const {
+    stageTimersByPet,
+    serverTime,
+    refetch: refetchTimers,
+  } = useTimers(userId);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [petName, setPetName] = useState('');
   const [selectedPetForStack, setSelectedPetForStack] = useState<Pet | null>(null);
@@ -350,13 +358,21 @@ export default function Home() {
   // Обработчики действий
   const handleHealthUp = (pet: Pet) => {
     if (pet.name) {
-    healthUp(pet.name);
+      healthUp(pet.name, {
+        onSettled: () => {
+          refetchTimers();
+        },
+      });
     }
   };
 
   const handleHealthUpWithCost = (pet: Pet) => {
     if (pet.name) {
-    healthUpWithCost(pet.name);
+      healthUpWithCost(pet.name, {
+        onSettled: () => {
+          refetchTimers();
+        },
+      });
     }
   };
 
@@ -370,7 +386,9 @@ export default function Home() {
 
   const handleResurrect = (pet: Pet) => {
     if (pet.name) {
-      resurrect(pet.name);
+      resurrect(pet.name).finally(() => {
+        refetchTimers();
+      });
     }
   };
 
@@ -395,6 +413,32 @@ export default function Home() {
     }));
   }, [selectedPetForStack, userId]);
 
+  const totalPetCount = totalPets || pets.length;
+  const alivePetCount = useMemo(
+    () => (typeof alivePets === 'number' ? alivePets : pets.filter(pet => pet.status === 'alive').length),
+    [alivePets, pets]
+  );
+  const deadPetCount = useMemo(
+    () => (typeof deadPets === 'number' ? deadPets : pets.filter(pet => pet.status === 'dead').length),
+    [deadPets, pets]
+  );
+
+  const determineCreationCost = useCallback(() => {
+    if (totalPetCount === 0) {
+      return createPetCosts?.first_pet ?? 0;
+    }
+    if (alivePetCount > 0) {
+      return createPetCosts?.has_alive ?? createPetCosts?.default ?? 500;
+    }
+    if (deadPetCount > 0) {
+      return createPetCosts?.all_dead ?? createPetCosts?.default ?? 200;
+    }
+    return 0;
+  }, [alivePetCount, createPetCosts, deadPetCount, totalPetCount]);
+
+  const paidCreationCost = determineCreationCost();
+  const isPaidCreationRequired = paidCreationCost > 0;
+
   // Получение creature_json для текстового окна
   const creatureText = useMemo(() => {
     if (!selectedPetForStack) return ['Выберите питомца для просмотра информации'];
@@ -414,6 +458,7 @@ export default function Home() {
       {
         onSettled: () => {
           setPetName('');
+          refetchTimers();
         },
         onError: () => {
           // опционально можно вернуть модалку, но оставляем закрытой по требованиям
@@ -517,7 +562,10 @@ export default function Home() {
             onResurrect={handleResurrect}
             onImageClick={handleImageClick}
             wallet={wallet}
-            resurrectCost={500}
+            healthUpCosts={healthUpCosts}
+            resurrectCosts={resurrectCosts}
+            stageTimers={stageTimersByPet}
+            serverTime={serverTime}
             baseWidth={carouselSizes?.baseWidth ?? 380}
             cardHeight={carouselSizes?.cardHeight ?? 500}
             autoplay={false}
@@ -545,9 +593,9 @@ export default function Home() {
           onCreate={handleCreatePet}
           onCancel={handleCancelCreate}
           isCreating={isCreating}
-          canCreateFree={true}
+          canCreateFree={!isPaidCreationRequired}
           walletCoins={wallet?.coins}
-          paidCost={0}
+          paidCost={paidCreationCost}
         />
       </DialogEnhanced>
 

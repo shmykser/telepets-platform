@@ -14,7 +14,7 @@ from config.settings import (
     HEALTH_LOW, 
     HEALTH_MIN,
     HEALTH_MAX,
-    STAGE_TRANSITION_INTERVAL,
+    STAGE_TRANSITION_INTERVALS,
     STAGE_ORDER,
     STAGE_MESSAGES,
     TELEGRAM_MESSAGES,
@@ -25,7 +25,7 @@ from services.telegram_client import telegram_client
 from services.economy import EconomyService
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -75,7 +75,7 @@ async def decrease_health_task():
                             except Exception:
                                 pass
                             # фиксируем момент окончания жизненного цикла
-                            pet.updated_at = datetime.utcnow()
+                            pet.updated_at = datetime.now(timezone.utc)
                             
                             # Создаем уведомление о смерти
                             death_message = STAGE_MESSAGES.get(stage_before_death, {}).get('death', 'Питомец умер')
@@ -146,16 +146,20 @@ async def decrease_health_task():
                             )
                         
                         # Проверяем переход на следующую стадию
-                        current_time = datetime.utcnow()
-                        # Используем момент начала текущей стадии: updated_at (если было изменение стадии)
-                        stage_started_at = (pet.updated_at or pet.created_at)
-                        stage_started_at_naive = stage_started_at.replace(tzinfo=None)
-                        time_since_stage_start = current_time - stage_started_at_naive
+                        current_time = datetime.now(timezone.utc)
+                        stage_started_at = pet.updated_at or pet.created_at
+                        if stage_started_at is None:
+                            continue
+                        if stage_started_at.tzinfo is None:
+                            stage_started_at = stage_started_at.replace(tzinfo=timezone.utc)
+                        time_since_stage_start = current_time - stage_started_at
+                        transition_seconds = STAGE_TRANSITION_INTERVALS.get(pet.state.value, 0)
                         
                         if (
-                            pet.status == PetLifeStatus.alive and 
-                            pet.health > HEALTH_MIN and 
-                            time_since_stage_start.total_seconds() >= STAGE_TRANSITION_INTERVAL
+                            transition_seconds
+                            and pet.status == PetLifeStatus.alive 
+                            and pet.health > HEALTH_MIN 
+                            and time_since_stage_start.total_seconds() >= transition_seconds
                         ):
                             
                             current_stage_index = STAGE_ORDER.index(pet.state.value)
@@ -164,7 +168,7 @@ async def decrease_health_task():
                                 new_stage = STAGE_ORDER[current_stage_index + 1]
                                 pet.state = PetState(new_stage)
                                 # фиксируем момент начала новой стадии (для корректного таймера)
-                                pet.updated_at = datetime.utcnow()
+                                pet.updated_at = datetime.now(timezone.utc)
                                 # Фиксируем смену стадии сразу, чтобы другие запросы видели актуальное состояние
                                 await db.commit()
                                 
@@ -249,7 +253,7 @@ async def decrease_health_task():
 async def check_pet_achievements(db: AsyncSession, user_id: str, pet: Pet):
     """Проверяет достижения питомца"""
     try:
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         time_since_creation = current_time - pet.created_at.replace(tzinfo=None)
         
         # Достижение за выживание 1 час
@@ -309,7 +313,7 @@ async def finalize_auctions_task():
     while True:
         try:
             async with AsyncSessionLocal() as db:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 result = await db.execute(
                     select(Auction).where(Auction.status == AuctionStatus.active, Auction.end_time <= now).limit(50)
                 )

@@ -22,6 +22,7 @@ class CreatePetResponse(BaseModel):
     image_url: Optional[str] = None
     paid: bool
     paid_cost: int
+    creation_cost_tier: Optional[str] = None
     wallet: dict
 
 

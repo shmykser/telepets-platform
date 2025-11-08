@@ -9,6 +9,7 @@ from api import auth_api
 from api import market
 from api import user_profile, games
 from api import websocket
+from api import timers
 from core.tasks import start_health_decrease_task, start_auction_finalize_task
 from core.monitoring import start_monitoring_task, MonitoringMiddleware
 from config.settings import (
@@ -189,12 +190,14 @@ async def test():
 @app.get("/time-test")
 async def time_test():
     """Тестовый endpoint для проверки времени"""
-    from datetime import datetime, timedelta
-    from config.settings import STAGE_TRANSITION_INTERVAL
+    from datetime import datetime, timedelta, timezone
+    from config.settings import STAGE_TRANSITION_INTERVALS
     
-    created_at = datetime.utcnow() - timedelta(seconds=STAGE_TRANSITION_INTERVAL)
-    now = datetime.utcnow()
-    transition_time = created_at + timedelta(seconds=STAGE_TRANSITION_INTERVAL)
+    stage = 'egg'
+    interval = STAGE_TRANSITION_INTERVALS.get(stage, 0)
+    created_at = datetime.now(timezone.utc) - timedelta(seconds=interval)
+    now = datetime.now(timezone.utc)
+    transition_time = created_at + timedelta(seconds=interval)
     remaining_seconds = max(0, int((transition_time - now).total_seconds()))
     
     return {
@@ -202,7 +205,8 @@ async def time_test():
         "now": now.isoformat(),
         "transition_time": transition_time.isoformat(),
         "remaining_seconds": remaining_seconds,
-        "stage_transition_interval": STAGE_TRANSITION_INTERVAL
+        "stage": stage,
+        "stage_transition_interval": interval
     }
 
 # Подключение роутеров с префиксом /api
@@ -215,6 +219,7 @@ app.include_router(market.router, prefix="/api")
 app.include_router(user_profile.router, prefix="/api")
 app.include_router(games.router, prefix="/api/games", tags=["games"])
 app.include_router(websocket.router, prefix="/api")
+app.include_router(timers.router, prefix="/api")
 
 # Служебные роутеры (без /api префикса)
 app.include_router(monitoring.router)

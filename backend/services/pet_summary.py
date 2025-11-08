@@ -13,7 +13,7 @@ from config.settings import (
     API_BASE_URL,
     INITIAL_COINS,
     STAGE_ORDER,
-    STAGE_TRANSITION_INTERVAL,
+    STAGE_TRANSITION_INTERVALS,
     get_pet_image_api_url,
 )
 from models import Pet, PetLifeStatus
@@ -86,7 +86,11 @@ class PetSummaryService:
         if not stage_started_at:
             return 0
 
-        transition_time = stage_started_at + timedelta(seconds=STAGE_TRANSITION_INTERVAL)
+        interval = STAGE_TRANSITION_INTERVALS.get(current_stage)
+        if not interval:
+            return 0
+
+        transition_time = stage_started_at + timedelta(seconds=interval)
         remaining = (transition_time - datetime.utcnow()).total_seconds()
         return max(0, int(remaining))
 

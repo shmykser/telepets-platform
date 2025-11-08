@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import React from 'react';
-import type { Pet } from '@/types';
+import type { Pet, StageCostMap } from '@/types';
 
 export interface PetCarouselEnhancedProps {
   pets: Pet[];
@@ -12,7 +12,8 @@ export interface PetCarouselEnhancedProps {
   onPlay?: (pet: Pet) => void;
   onResurrect?: (pet: Pet) => void;
   wallet?: { coins: number };
-  resurrectCost?: number;
+  healthUpCosts?: StageCostMap;
+  resurrectCosts?: StageCostMap;
   baseWidth?: number;
   cardHeight?: number;
   autoplay?: boolean;
@@ -46,7 +47,8 @@ interface PetCardProps {
   onPlay?: (pet: Pet) => void;
   onResurrect?: (pet: Pet) => void;
   wallet?: { coins: number };
-  resurrectCost: number;
+  healthUpCosts?: StageCostMap;
+  resurrectCosts?: StageCostMap;
 }
 
 // Выносим PetCard за пределы основного компонента для правильной работы React.memo
@@ -65,7 +67,8 @@ const PetCard = React.memo(({
   onPlay,
   onResurrect,
   wallet,
-  resurrectCost
+  healthUpCosts,
+  resurrectCosts
 }: PetCardProps) => {
   const isCardHovered = hoveredCardId === pet.id?.toString();
   const imgRef = useRef<HTMLImageElement>(null);
@@ -117,6 +120,27 @@ const PetCard = React.memo(({
 
   const stageInfo = getStageInfo(pet.state);
   const healthStatus = getHealthStatus();
+  const stageKey = pet.state ?? '';
+  const walletCoins = typeof wallet?.coins === 'number' ? wallet.coins : undefined;
+  const paidHealthUpCost =
+    stageKey && typeof healthUpCosts?.[stageKey] === 'number'
+      ? healthUpCosts[stageKey]
+      : undefined;
+  const canPayPaidAction =
+    paidHealthUpCost === undefined
+      ? true
+      : walletCoins === undefined
+        ? true
+        : walletCoins >= paidHealthUpCost;
+  const paidCostLabel = paidHealthUpCost !== undefined ? `${paidHealthUpCost} монет` : '—';
+  const stageResurrectCost =
+    stageKey && typeof resurrectCosts?.[stageKey] === 'number'
+      ? resurrectCosts[stageKey]
+      : undefined;
+  const effectiveResurrectCost = typeof stageResurrectCost === 'number' ? stageResurrectCost : 0;
+  const canResurrect = walletCoins !== undefined ? walletCoins >= effectiveResurrectCost : true;
+  const resurrectCostLabel =
+    typeof stageResurrectCost === 'number' ? `${stageResurrectCost} монет` : '—';
 
   return (
     <motion.div
@@ -244,28 +268,28 @@ const PetCard = React.memo(({
             <motion.button
               className="w-full px-4 py-3 rounded-lg text-sm sm:text-base font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2"
               style={{
-                backgroundImage: wallet && wallet.coins >= resurrectCost
+                backgroundImage: canResurrect
                   ? 'linear-gradient(90deg, #ec4899, #f43f5e, #dc2626, #ec4899)'
                   : 'linear-gradient(90deg, #6b7280, #4b5563, #374151, #6b7280)',
-                backgroundSize: wallet && wallet.coins >= resurrectCost ? '200% 100%' : '100% 100%',
-                opacity: wallet && wallet.coins >= resurrectCost ? 1 : 0.6,
-                cursor: wallet && wallet.coins >= resurrectCost ? 'pointer' : 'not-allowed'
+                backgroundSize: canResurrect ? '200% 100%' : '100% 100%',
+                opacity: canResurrect ? 1 : 0.6,
+                cursor: canResurrect ? 'pointer' : 'not-allowed'
               }}
-              animate={wallet && wallet.coins >= resurrectCost ? { backgroundPosition: ['0%', '100%', '0%'] } : {}}
+              animate={canResurrect ? { backgroundPosition: ['0%', '100%', '0%'] } : {}}
               transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-              whileHover={wallet && wallet.coins >= resurrectCost ? { scale: 1.02 } : {}}
-              whileTap={wallet && wallet.coins >= resurrectCost ? { scale: 0.98 } : {}}
-              disabled={!wallet || wallet.coins < resurrectCost}
+              whileHover={canResurrect ? { scale: 1.02 } : {}}
+              whileTap={canResurrect ? { scale: 0.98 } : {}}
+              disabled={!canResurrect}
               onClick={(e) => {
                 e.stopPropagation();
-                if (wallet && wallet.coins >= resurrectCost && onResurrect) {
+                if (canResurrect && onResurrect) {
                   onResurrect(pet);
                 }
               }}
             >
               <span className="text-lg">✨</span>
               <span className="relative z-10">Воскресить питомца</span>
-              <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCost} монет</span>
+              <span className="relative z-10 text-xs sm:text-sm opacity-90">{resurrectCostLabel}</span>
             </motion.button>
           ) : (
             <div className="flex gap-2 flex-shrink-0">
@@ -289,19 +313,26 @@ const PetCard = React.memo(({
               <motion.button
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px]"
                 style={{
-                  backgroundImage: 'linear-gradient(90deg, #a855f7, #ec4899, #f43f5e, #a855f7)',
-                  backgroundSize: '200% 100%'
+                  backgroundImage: canPayPaidAction
+                    ? 'linear-gradient(90deg, #a855f7, #ec4899, #f43f5e, #a855f7)'
+                    : 'linear-gradient(90deg, #6b7280, #4b5563, #374151, #6b7280)',
+                  backgroundSize: '200% 100%',
+                  opacity: canPayPaidAction ? 1 : 0.6,
+                  cursor: canPayPaidAction ? 'pointer' : 'not-allowed'
                 }}
-                animate={{ backgroundPosition: ['0%', '100%', '0%'] }}
+                animate={canPayPaidAction ? { backgroundPosition: ['0%', '100%', '0%'] } : {}}
                 transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 0.5 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={canPayPaidAction ? { scale: 1.05 } : {}}
+                whileTap={canPayPaidAction ? { scale: 0.95 } : {}}
+                disabled={!canPayPaidAction}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onHealthUpWithCost?.(pet);
+                  if (canPayPaidAction) {
+                    onHealthUpWithCost?.(pet);
+                  }
                 }}
               >
-                <span className="relative z-10">10 монет</span>
+                <span className="relative z-10">{paidCostLabel}</span>
               </motion.button>
               <motion.button
                 className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px]"
@@ -406,9 +437,12 @@ const PetCard = React.memo(({
   const heightUnchanged = prevProps.adaptiveCardHeight === nextProps.adaptiveCardHeight;
   const offsetUnchanged = prevProps.trackItemOffset === nextProps.trackItemOffset;
   const hoveredUnchanged = prevProps.hoveredCardId === nextProps.hoveredCardId;
+  const costsUnchanged =
+    prevProps.healthUpCosts === nextProps.healthUpCosts &&
+    prevProps.resurrectCosts === nextProps.resurrectCosts;
   
   // Не ре-рендерим если все пропсы не изменились
-  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged;
+  return petUnchanged && indexUnchanged && itemWidthUnchanged && heightUnchanged && offsetUnchanged && hoveredUnchanged && costsUnchanged;
 });
 
 export default function PetCarouselEnhanced({
@@ -419,7 +453,8 @@ export default function PetCarouselEnhanced({
   onPlay,
   onResurrect,
   wallet,
-  resurrectCost = 500,
+  healthUpCosts,
+  resurrectCosts,
   baseWidth = 380,
   cardHeight = 500,
   autoplay = false,
@@ -659,7 +694,8 @@ export default function PetCarouselEnhanced({
               onPlay={handlePlay}
               onResurrect={handleResurrect}
               wallet={wallet}
-              resurrectCost={resurrectCost}
+              healthUpCosts={healthUpCosts}
+              resurrectCosts={resurrectCosts}
             />
           ))}
         </motion.div>

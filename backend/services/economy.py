@@ -124,6 +124,13 @@ class EconomyService:
             wallet = await EconomyService.get_wallet(db, user_id)
             if not wallet:
                 raise ValueError(f"Кошелек пользователя {user_id} не найден")
+
+            if wallet.coins is None:
+                wallet.coins = 0
+            if wallet.total_earned is None:
+                wallet.total_earned = 0
+            if wallet.total_spent is None:
+                wallet.total_spent = 0
             
             balance_before = wallet.coins
             
@@ -212,7 +219,8 @@ class EconomyService:
         user_id: str,
         amount: int,
         description: str,
-        source: str = "reward"
+        source: str = "reward",
+        transaction_data: Optional[Dict] = None,
     ) -> bool:
         """Добавляет монеты пользователю"""
         try:
@@ -221,18 +229,22 @@ class EconomyService:
             if not wallet:
                 wallet = await EconomyService.create_user_wallet(db, user_id)
 
+            extra_data = {"source": source}
+            if transaction_data:
+                extra_data.update(transaction_data)
+
             await EconomyService.create_transaction(
                 db=db,
                 user_id=user_id,
                 transaction_type=TransactionType.earning,
                 amount=amount,
                 description=description,
-                transaction_data={"source": source}
+                transaction_data=extra_data
             )
             return True
         except Exception as e:
-            logger.error(f"Ошибка добавления монет: {e}")
-            return False
+            logger.error(f"Ошибка добавления монет: user_id={user_id}, amount={amount}, error={e}", exc_info=True)
+            raise
     
     @staticmethod
     async def can_afford_action(db: AsyncSession, user_id: str, action: str, stage: str = None) -> bool:
@@ -241,14 +253,23 @@ class EconomyService:
             wallet = await EconomyService.get_wallet(db, user_id)
             if not wallet:
                 return False
-            
-            if action == 'health_up' and stage:
-                cost = ACTION_COSTS.get('health_up', {}).get(stage, 0)
+
+            stage_key = getattr(stage, "value", stage)
+            cost_config = ACTION_COSTS.get(action, 0)
+
+            if isinstance(cost_config, dict):
+                if stage_key and stage_key in cost_config:
+                    cost = cost_config[stage_key]
+                elif 'default' in cost_config:
+                    cost = cost_config['default']
+                else:
+                    logger.debug("Не найден ключ стадии %s для действия %s, использую 0", stage_key, action)
+                    cost = 0
             else:
-                cost = ACTION_COSTS.get(action, 0)
-            
+                cost = cost_config
+
             return wallet.coins >= cost
-            
+
         except Exception as e:
             logger.error(f"Ошибка проверки возможности действия: {e}")
             return False
@@ -256,9 +277,18 @@ class EconomyService:
     @staticmethod
     async def get_action_cost(action: str, stage: str = None) -> int:
         """Получает стоимость действия"""
-        if action == 'health_up' and stage:
-            return ACTION_COSTS.get('health_up', {}).get(stage, 0)
-        return ACTION_COSTS.get(action, 0)
+        stage_key = getattr(stage, "value", stage)
+        cost_config = ACTION_COSTS.get(action, 0)
+
+        if isinstance(cost_config, dict):
+            if stage_key and stage_key in cost_config:
+                return cost_config[stage_key]
+            if 'default' in cost_config:
+                return cost_config['default']
+            logger.debug("Не найден ключ стадии %s для действия %s, возвращаю 0", stage_key, action)
+            return 0
+
+        return cost_config or 0
     
     @staticmethod
     async def get_transaction_history(

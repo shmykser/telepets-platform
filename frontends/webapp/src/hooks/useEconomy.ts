@@ -3,7 +3,7 @@ import { economyApi, marketApi, authApi } from '@/lib/api'
 import { getStoredUserId } from '@/utils'
 import { notifySuccess, notifyError } from '@/components/Notification'
 import { useMemo } from 'react'
-import type { Auction } from '@/types'
+import type { Auction, ActionCostsResponse, ActionCostConfig, PurchaseOptionsMap, StageCostMap } from '@/types'
 import { usePetWebSocket } from './usePetWebSocket' // Для интеграции с WebSocket
 
 export function useWallet() {
@@ -76,18 +76,29 @@ export function useUserStats() {
 
 export function useActionCosts() {
   const {
-    data: actionCosts,
+    data,
     isLoading,
     error,
-  } = useQuery({ 
+  } = useQuery<ActionCostsResponse>({ 
     queryKey: ['actionCosts'], 
     queryFn: () => economyApi.getActionCosts(),
     refetchInterval: 300000, // Refetch every 5 minutes
     retry: 2,
   })
 
+  const actionCosts = data?.action_costs as ActionCostConfig | undefined
+  const purchaseOptions = data?.purchase_options as PurchaseOptionsMap | undefined
+  const healthUpCosts = actionCosts?.health_up as StageCostMap | undefined
+  const resurrectCosts = actionCosts?.resurrect as StageCostMap | undefined
+  const createPetCosts = actionCosts?.create_pet as StageCostMap | undefined
+
   return {
     actionCosts,
+    purchaseOptions,
+    healthUpCosts,
+    resurrectCosts,
+    createPetCosts,
+    raw: data,
     isLoading,
     error,
   }
@@ -101,6 +112,7 @@ export function useDailyLogin() {
     mutationFn: () => economyApi.claimDailyLogin(userId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['wallet', userId] })
+      queryClient.invalidateQueries({ queryKey: ['timers', userId] })
       notifySuccess(`Получено ${data.reward_amount} монет!`)
     },
     onError: (error: any) => {
