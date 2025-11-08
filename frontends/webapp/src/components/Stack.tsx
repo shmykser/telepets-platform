@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, useTransform, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from './ui/Card';
 import { cn } from '../utils';
 import DialogEnhanced from './DialogEnhanced';
@@ -18,19 +18,25 @@ interface CardRotateProps {
   sensitivity: number;
 }
 
-const CardRotate = React.memo(function CardRotate({ children, onSendToBack, sensitivity }: CardRotateProps) {
-  const handleDragEnd = useCallback(
-    (_: never, info: { offset: { x: number; y: number } }) => {
-      if (Math.abs(info.offset.x) > sensitivity || Math.abs(info.offset.y) > sensitivity) {
-        onSendToBack();
-      }
-    },
-    [onSendToBack, sensitivity]
-  );
+function CardRotate({ children, onSendToBack, sensitivity }: CardRotateProps) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-100, 100], [60, -60]);
+  const rotateY = useTransform(x, [-100, 100], [-60, 60]);
+
+  function handleDragEnd(_: never, info: { offset: { x: number; y: number } }) {
+    if (Math.abs(info.offset.x) > sensitivity || Math.abs(info.offset.y) > sensitivity) {
+      onSendToBack();
+    } else {
+      x.set(0);
+      y.set(0);
+    }
+  }
 
   return (
     <motion.div
       className="absolute cursor-grab active:cursor-grabbing"
+      style={{ x, y, rotateX, rotateY }}
       drag
       dragConstraints={{ top: 0, right: 0, bottom: 0, left: 0 }}
       dragElastic={0.6}
@@ -40,7 +46,7 @@ const CardRotate = React.memo(function CardRotate({ children, onSendToBack, sens
       {children}
     </motion.div>
   );
-});
+}
 
 export interface StackProps {
   randomRotation?: boolean;
@@ -149,54 +155,59 @@ export default function Stack({
           </div>
         ) : (
           cards.map((card, index) => {
-            const randomRotate = randomRotation ? Math.random() * 10 - 5 : 0;
-            return (
-              <CardRotate
-                key={card.id}
-                onSendToBack={() => sendToBack(card.id)}
-                sensitivity={sensitivity}
-              >
-                <motion.div
-                  onClick={() => handleCardClick(card)}
-                  animate={{
-                    rotateZ: (cards.length - index - 1) * 4 + randomRotate,
-                    scale: 1 + index * 0.06 - cards.length * 0.06,
-                    transformOrigin: '90% 90%'
-                  }}
-                  initial={false}
-                  transition={{
-                    type: 'spring',
-                    stiffness: animationConfig.stiffness,
-                    damping: animationConfig.damping
-                  }}
-                  style={{
-                    width: cardDimensions.width,
-                    height: cardDimensions.height
-                  }}
-                  className={disableClick ? '' : 'cursor-pointer'}
-                >
-                  <Card
-                    className={cn(
-                      'rounded-2xl overflow-hidden shadow-2xl',
-                      'h-full w-full p-0 relative',
-                      'bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90',
-                      'backdrop-blur-xl border border-white/20',
-                      'transition-all duration-300'
-                    )}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none z-10" />
+          const randomRotate = randomRotation ? Math.random() * 10 - 5 : 0;
+          const isTop = index === cards.length - 1;
 
-                    <CardContent className="p-0 h-full w-full relative">
-                      <img
-                        src={card.img}
-                        alt={card.title || `card-${card.id}`}
-                        className="w-full h-full object-contain pointer-events-none bg-gradient-to-br from-gray-900/50 to-gray-800/50"
-                      />
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </CardRotate>
-            );
+          return (
+            <CardRotate
+              key={card.id}
+              onSendToBack={() => sendToBack(card.id)}
+              sensitivity={sensitivity}
+            >
+              <motion.div
+                onClick={() => handleCardClick(card)}
+                animate={{
+                  rotateZ: (cards.length - index - 1) * 4 + randomRotate,
+                  scale: 1 + index * 0.06 - cards.length * 0.06,
+                  transformOrigin: '90% 90%'
+                }}
+                initial={false}
+                transition={{
+                  type: 'spring',
+                  stiffness: animationConfig.stiffness,
+                  damping: animationConfig.damping
+                }}
+                style={{
+                  width: cardDimensions.width,
+                  height: cardDimensions.height
+                }}
+                className={disableClick ? '' : 'cursor-pointer'}
+              >
+                {/* Glassmorphism Card */}
+                <Card
+                  className={cn(
+                    'rounded-2xl overflow-hidden shadow-2xl',
+                    'h-full w-full p-0 relative',
+                    'bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90',
+                    'backdrop-blur-xl border border-white/20',
+                    'transition-all duration-300',
+                    isTop && 'hover:border-white/40 hover:shadow-[0_0_30px_rgba(139,92,246,0.5)]'
+                  )}
+                >
+                  {/* Frosted glass overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none z-10" />
+
+                  <CardContent className="p-0 h-full w-full relative">
+                    <img
+                      src={card.img}
+                      alt={card.title || `card-${card.id}`}
+                      className="w-full h-full object-contain pointer-events-none bg-gradient-to-br from-gray-900/50 to-gray-800/50"
+                    />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </CardRotate>
+          );
           })
         )}
       </div>
