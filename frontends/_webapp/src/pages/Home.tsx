@@ -13,6 +13,7 @@ import AllDeadEnhanced from '@/components/AllDeadEnhanced'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 export default function Home() {
+  const alignedWidthClass = 'w-full max-w-[480px]';
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [petName, setPetName] = useState('')
   const [isCreatingPending, setIsCreatingPending] = useState(false)
@@ -215,29 +216,36 @@ export default function Home() {
       )}
 
       {/* Quick Stats */}
-      <QuickStatsEnhanced
-        stats={{
-          totalPets: pet?.total_pets || (hasPetsData ? allPets.length : 0) || 0,
-          alivePets: pet?.alive_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) !== 'dead').length : 0) || 0,
-          deadPets: pet?.dead_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) === 'dead').length : 0) || 0,
-          coins: pet?.wallet?.coins || liveWallet?.coins || wallet?.coins || 0,
-        }}
-        columns={4}
-      />
+      <div className="flex justify-center">
+        <QuickStatsEnhanced
+          stats={{
+            totalPets: pet?.total_pets || (hasPetsData ? allPets.length : 0) || 0,
+            alivePets: pet?.alive_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) !== 'dead').length : 0) || 0,
+            deadPets: pet?.dead_pets || (hasPetsData ? allPets.filter((p: any) => (p.status || p.life_status) === 'dead').length : 0) || 0,
+            coins: pet?.wallet?.coins || liveWallet?.coins || wallet?.coins || 0,
+          }}
+          columns={4}
+          className={alignedWidthClass}
+        />
+      </div>
 
       {/* Pet Carousel - using old component temporarily */}
       {!allLoading && hasPetsData && (
-        <PetCarousel
-          pets={allPets}
-          onSelect={() => {}}
-          onHealthUp={(name) => healthUp(name)}
-          onHealthUpWithCost={(name) => healthUpWithCost(name)}
-          onResurrect={(name) => resurrect(name)}
-          isHealthUpLoading={isHealthUpLoading}
-          isHealthUpWithCostLoading={isHealthUpWithCostLoading}
-          walletCoins={liveWallet?.coins ?? wallet?.coins}
-          actionCosts={actionCosts?.action_costs as any}
-        />
+        <div className="flex justify-center">
+          <div className={alignedWidthClass}>
+            <PetCarousel
+              pets={allPets}
+              onSelect={() => {}}
+              onHealthUp={(name) => healthUp(name)}
+              onHealthUpWithCost={(name) => healthUpWithCost(name)}
+              onResurrect={(name) => resurrect(name)}
+              isHealthUpLoading={isHealthUpLoading}
+              isHealthUpWithCostLoading={isHealthUpWithCostLoading}
+              walletCoins={liveWallet?.coins ?? wallet?.coins}
+              actionCosts={actionCosts?.action_costs as any}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

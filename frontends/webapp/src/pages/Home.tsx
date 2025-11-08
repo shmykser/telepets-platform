@@ -185,7 +185,7 @@ export default function Home() {
     updateHeights();
     window.addEventListener('resize', updateHeights);
     return () => window.removeEventListener('resize', updateHeights);
-  }, [totalPets, alivePets, deadPets, wallet?.coins]);
+  }, [totalPets, alivePets, deadPets, wallet?.coins, carouselSizes.baseWidth]);
 
   // Расчет размеров карусели с учетом всех элементов
   // Этот эффект работает одинаково и в браузере, и в Telegram
@@ -460,19 +460,26 @@ export default function Home() {
         }}
       >
         {/* Верхняя секция: быстрые статусы */}
-        <div 
-          ref={statsRef}
-          className="flex-shrink-0 mb-1.5 sm:mb-2 md:mb-3"
-        >
-          <QuickStatsVariants
-            stats={{
-              totalPets: totalPets || 0,
-              alivePets: alivePets || 0,
-              deadPets: deadPets || 0,
-              coins: wallet?.coins || 0
+        <div className="flex-shrink-0 mb-1.5 sm:mb-2 md:mb-3 flex justify-center">
+          <div
+            ref={statsRef}
+            className="w-full"
+            style={{
+              maxWidth: carouselSizes?.baseWidth ? `${carouselSizes.baseWidth}px` : '100%',
+              minWidth: 0
             }}
-            variant={1}
-          />
+          >
+            <QuickStatsVariants
+              stats={{
+                totalPets: totalPets || 0,
+                alivePets: alivePets || 0,
+                deadPets: deadPets || 0,
+                coins: wallet?.coins || 0
+              }}
+              variant={1}
+              className="w-full"
+            />
+          </div>
         </div>
 
         {/* Карусель питомцев - занимает все доступное пространство */}
