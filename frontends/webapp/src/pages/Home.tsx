@@ -13,6 +13,27 @@ import { getStoredUserId } from '@/utils';
 import { isTelegramWebApp } from '@/utils/telegram';
 import { getAvailableStages, formatCreatureJson } from '@/utils/petUtils';
 
+const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const calculateCarouselBaseWidth = (viewportWidth: number, availableWidth: number): number => {
+  if (viewportWidth < 640) {
+    return availableWidth;
+  }
+
+  if (viewportWidth < 1024) {
+    const target = clampValue(viewportWidth * 0.85, 420, 640);
+    return Math.min(availableWidth, target);
+  }
+
+  if (viewportWidth < 1440) {
+    const target = clampValue(viewportWidth * 0.5, 440, 700);
+    return Math.min(availableWidth, target);
+  }
+
+  const target = clampValue(viewportWidth * 0.45, 520, 760);
+  return Math.min(availableWidth, target);
+};
+
 export default function Home() {
   const { pets, totalPets, alivePets, deadPets, isLoading, wallet } = useAllPets();
   const { healthUp, healthUpWithCost, resurrect, createPet, isCreating } = usePet();
@@ -273,37 +294,13 @@ export default function Home() {
       // Ширина карусели = ширина экрана - padding контейнера - padding карусели
       const carouselWidth = width - containerPaddingXValue * 2 - carouselPaddingX * 2;
       
-      if (width < 640) {
-        // Мобильные устройства (< 640px)
-        setCarouselSizes({ 
-          baseWidth: carouselWidth,
-          cardHeight: Math.max(300, availableHeight) // Минимальная высота 300px
-        });
-      } else if (width >= 640 && width < 1024) {
-        // Планшеты (640px - 1023px)
-        setCarouselSizes({ 
-          baseWidth: carouselWidth,
-          cardHeight: Math.max(400, availableHeight)
-        });
-      } else if (isIPadPro) {
-        // iPad Pro (1024px ширина, высота > 1000px)
-        setCarouselSizes({ 
-          baseWidth: Math.min(700, carouselWidth),
-          cardHeight: Math.max(500, availableHeight)
-        });
-      } else if (width >= 1024 && width < 1280) {
-        // Небольшие десктопы (1024px - 1279px, но не iPad Pro)
-        setCarouselSizes({ 
-          baseWidth: 420,
-          cardHeight: Math.max(400, availableHeight)
-        });
-      } else {
-        // Большие десктопы (>= 1280px)
-        setCarouselSizes({ 
-          baseWidth: 480,
-          cardHeight: Math.max(450, availableHeight)
-        });
-      }
+      const baseWidth = calculateCarouselBaseWidth(width, carouselWidth);
+      const minCardHeight = width < 640 ? 300 : width < 1024 ? 400 : isIPadPro ? 500 : 420;
+
+      setCarouselSizes({
+        baseWidth,
+        cardHeight: Math.max(minCardHeight, availableHeight)
+      });
     };
 
     updateSizes();
