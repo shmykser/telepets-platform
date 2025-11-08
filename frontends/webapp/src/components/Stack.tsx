@@ -184,16 +184,14 @@ export default function Stack({
                 className={disableClick ? '' : 'cursor-pointer'}
               >
                 {/* Glassmorphism Card */}
-                <Card
-                  className={cn(
-                    'rounded-2xl overflow-hidden shadow-2xl',
-                    'h-full w-full p-0 relative',
-                    'bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90',
-                    'backdrop-blur-xl border border-white/20',
-                    'transition-all duration-300',
-                    isTop && 'hover:border-white/40 hover:shadow-[0_0_30px_rgba(139,92,246,0.5)]'
-                  )}
-                >
+                 <Card
+                   className={cn(
+                     'rounded-2xl overflow-hidden shadow-2xl',
+                     'h-full w-full p-0 relative',
+                     'bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90',
+                     'backdrop-blur-xl border border-white/20'
+                   )}
+                 >
                   {/* Frosted glass overlay */}
                   <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none z-10" />
 
