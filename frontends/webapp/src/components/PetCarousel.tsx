@@ -338,6 +338,8 @@ const PetCard = React.memo(({
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden',
                   transform: 'translateZ(0)',
+                  filter: isDead ? 'grayscale(0.95) saturate(0.4) brightness(0.7)' : 'none',
+                  transition: 'filter 0.35s ease, opacity 0.3s ease',
                   imageRendering: 'auto',
                   display: 'block',
                   visibility: 'visible',
