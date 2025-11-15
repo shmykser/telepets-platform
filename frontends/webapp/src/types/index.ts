@@ -1,5 +1,21 @@
 export type PetStage = 'egg' | 'baby' | 'adult'
 
+export type CharacteristicStatus = 'normal' | 'warning' | 'critical'
+
+export interface PetCharacteristic {
+  value: number
+  status: CharacteristicStatus
+}
+
+export type PetCharacteristicMap = Record<string, PetCharacteristic>
+
+export interface HealthTickSummary {
+  interval_seconds: number
+  penalty: number
+  regen_amount: number
+  last_tick_at?: string
+}
+
 export interface Pet {
   id?: number | string
   user_id?: string
@@ -25,6 +41,8 @@ export interface Pet {
   message?: string
   creature_json?: any
   creature?: any
+  characteristics?: PetCharacteristicMap
+  health_tick?: HealthTickSummary
 }
 
 export interface Wallet {

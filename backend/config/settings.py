@@ -1,6 +1,11 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv, find_dotenv
+from .pet_characteristics import (
+    PET_CHARACTERISTICS,
+    HEALTH_DEGRADATION_RULES,
+    CHARACTERISTIC_ACTIONS,
+)
 
 # Загружаем переменные окружения из .env файла (ищем от корня проекта)
 # find_dotenv поднимется вверх от текущего файла/рабочей директории и найдёт ближайший .env
@@ -42,9 +47,9 @@ HEALTH_UP_AMOUNTS = {
 # Настройки перехода между стадиями (в секундах)
 # Значения указаны для удобства тестирования; в проде будут увеличены до нескольких дней
 STAGE_TRANSITION_INTERVALS = {
-    'egg': 10 * 60,    # 10 минут
-    'baby': 20 * 60,   # 20 минут
-    'adult': 30 * 60,  # 30 минут
+    'egg': 12000, # 3 часа
+    'baby': 18000, # 5 часов
+    'adult': 24000, # 7 часов
 }
 
 

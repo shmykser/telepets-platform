@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class PetSchema(BaseModel):
@@ -26,4 +26,31 @@ class CreatePetResponse(BaseModel):
     wallet: dict
 
 
+class CharacteristicSnapshot(BaseModel):
+    value: int
+    status: str
 
+
+class HealthTickSchema(BaseModel):
+    interval_seconds: int
+    penalty: int
+    regen_amount: int
+    last_tick_at: Optional[str] = None
+
+
+class PetCharacteristicsResponse(BaseModel):
+    pet_id: int
+    characteristics: Dict[str, CharacteristicSnapshot]
+    health_tick: Optional[HealthTickSchema]
+
+
+class CharacteristicActionRequest(BaseModel):
+    action_key: str
+    value: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class CharacteristicActionResponse(PetCharacteristicsResponse):
+    characteristic: str
+    value: int
+    status: str

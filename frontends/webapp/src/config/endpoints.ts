@@ -22,9 +22,9 @@ const DEV_CONFIG = {
     directBackendUrl: 'http://localhost:8080',
   },
   petImages: {
-    // В dev: относительный путь /pet-images проксируется через vite.config.ts на /api/pet-images
-    // См. vite.config.ts: proxy['/pet-images'] -> rewrite: (path) => `/api${path}`
-    url: '/pet-images',
+    // В dev: используем относительный путь /api/pet-images, который проксируется через vite.config.ts
+    // См. vite.config.ts: proxy['/api'] -> target: 'http://localhost:8080'
+    url: '/api/pet-images',
   },
 } as const
 

@@ -9,6 +9,7 @@ from .base import (
 )
 
 from .pets import Pet
+from .pet_characteristics import PetCharacteristic, PetCharacteristicEvent
 from .notifications import Notification
 from .users import User, Wallet, Transaction, Achievement
 from .market import Auction, AuctionBid, WalletHold, PetOwnershipHistory
@@ -23,6 +24,8 @@ __all__ = [
     "AuctionStatus",
     "WalletHoldStatus",
     "Pet",
+    "PetCharacteristic",
+    "PetCharacteristicEvent",
     "Notification",
     "User",
     "Wallet",

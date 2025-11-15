@@ -18,6 +18,8 @@ from config.settings import (
 )
 from models import Pet, PetLifeStatus
 from models import Wallet as WalletModel
+from services.pet_characteristics import PetCharacteristicService
+from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,12 @@ class PetSummaryService:
         return STAGE_ORDER[current_index + 1]
 
     @classmethod
-    def serialize_pet(cls, pet: Pet, base_url: Optional[str] = None) -> Dict[str, Any]:
+    def serialize_pet(
+        cls,
+        pet: Pet,
+        base_url: Optional[str] = None,
+        characteristics: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         time_to_next_stage = cls.calculate_time_to_next_stage(pet) if pet.status == PetLifeStatus.alive else 0
 
         try:
@@ -119,6 +126,16 @@ class PetSummaryService:
             "adult_en": pet.prompt_adult_en,
         }
 
+        values_for_health = {
+            key: item.get("value", 0) for key, item in (characteristics or {}).items()
+        }
+        health_tick = (
+            PetCharacteristicService.summarize(pet.state.value, values_for_health)
+            if characteristics
+            else None
+        )
+        health_tick = cls._augment_health_tick(health_tick, pet)
+
         return {
             "id": pet.id,
             "name": pet.name,
@@ -131,6 +148,8 @@ class PetSummaryService:
             "creature": creature,
             "prompts": prompts,
             "image_url": cls.build_image_url(pet, base_url),
+            "characteristics": characteristics,
+            "health_tick": health_tick,
         }
 
     @staticmethod
@@ -177,19 +196,24 @@ class PetSummaryService:
     @classmethod
     async def build_summary(cls, db: AsyncSession, user_id: str, base_url: Optional[str] = None) -> Dict[str, Any]:
         pets = await cls._fetch_pets(db, user_id)
+        characteristics_map = await cls._gather_characteristics(db, pets)
         wallet = await cls._fetch_wallet(db, user_id)
-        return cls._compose_single_summary(user_id, pets, wallet, base_url)
+        return cls._compose_single_summary(user_id, pets, wallet, base_url, characteristics_map)
 
     @classmethod
     async def build_all_pets_summary(cls, db: AsyncSession, user_id: str, base_url: Optional[str] = None) -> Dict[str, Any]:
         pets = await cls._fetch_pets(db, user_id)
+        characteristics_map = await cls._gather_characteristics(db, pets)
         wallet = await cls._fetch_wallet(db, user_id)
-        return cls._compose_all_pets_summary(user_id, pets, wallet, base_url)
+        return cls._compose_all_pets_summary(user_id, pets, wallet, base_url, characteristics_map)
 
     @classmethod
     async def _fetch_pets(cls, db: AsyncSession, user_id: str) -> List[Pet]:
         result = await db.execute(
-            select(Pet).where(Pet.user_id == user_id).order_by(Pet.created_at.desc())
+            select(Pet)
+            .options(selectinload(Pet.characteristics))
+            .where(Pet.user_id == user_id)
+            .order_by(Pet.created_at.desc())
         )
         pets = result.scalars().all()
         logger.debug("Получено %s питомцев для пользователя %s", len(pets), user_id)
@@ -210,6 +234,7 @@ class PetSummaryService:
         pets: List[Pet],
         wallet: Optional[WalletModel],
         base_url: Optional[str],
+        characteristics_map: Dict[int, Dict[str, Dict[str, Any]]],
     ) -> Dict[str, Any]:
         if not pets:
             return cls.empty_summary(user_id, wallet)
@@ -237,7 +262,11 @@ class PetSummaryService:
         next_stage = cls.determine_next_stage(active_pet)
         time_to_next_stage = cls.calculate_time_to_next_stage(active_pet)
 
-        serialized = cls.serialize_pet(active_pet, base)
+        serialized = cls.serialize_pet(
+            active_pet,
+            base,
+            characteristics_map.get(active_pet.id),
+        )
 
         return {
             "status": "success",
@@ -272,6 +301,7 @@ class PetSummaryService:
         pets: List[Pet],
         wallet: Optional[WalletModel],
         base_url: Optional[str],
+        characteristics_map: Dict[int, Dict[str, Dict[str, Any]]],
     ) -> Dict[str, Any]:
         if not pets:
             return cls.empty_summary(user_id, wallet) | {"pets": []}
@@ -280,7 +310,14 @@ class PetSummaryService:
         snapshot = cls._wallet_snapshot(wallet)
         base = cls._normalise_base_url(base_url)
 
-        pets_payload = [cls.serialize_pet(pet, base) for pet in pets]
+        pets_payload = [
+            cls.serialize_pet(
+                pet,
+                base,
+                characteristics_map.get(pet.id),
+            )
+            for pet in pets
+        ]
 
         status = "success" if alive else "all_dead"
         message = None
@@ -305,4 +342,22 @@ class PetSummaryService:
             summary["message"] = message
 
         return summary
+
+    @classmethod
+    async def _gather_characteristics(cls, db: AsyncSession, pets: List[Pet]) -> Dict[int, Dict[str, Dict[str, Any]]]:
+        result: Dict[int, Dict[str, Dict[str, Any]]] = {}
+        for pet in pets:
+            snapshot = await PetCharacteristicService.snapshot(db, pet)
+            result[pet.id] = snapshot
+        return result
+
+    @staticmethod
+    def _augment_health_tick(health_tick: Optional[Dict[str, Any]], pet: Pet) -> Optional[Dict[str, Any]]:
+        if not health_tick:
+            return health_tick
+        last_tick = pet.health_updated_at or pet.updated_at or pet.created_at
+        if last_tick:
+            health_tick = dict(health_tick)
+            health_tick["last_tick_at"] = PetSummaryService._format_datetime(last_tick)
+        return health_tick
 

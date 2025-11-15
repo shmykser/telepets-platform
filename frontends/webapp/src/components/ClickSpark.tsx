@@ -36,7 +36,13 @@ function createParticles(count = 10): SparkParticle[] {
   return particles
 }
 
+const IS_ENABLED = false;
+
 export default function ClickSpark() {
+  if (!IS_ENABLED) {
+    return null;
+  }
+
   const [bursts, setBursts] = useState<SparkBurst[]>([])
   const containerRef = useRef<HTMLDivElement | null>(null)
 

@@ -22,8 +22,8 @@ if config.config_file_name is not None:
 import sys
 from pathlib import Path
 
-# Ensure project root is importable so `import backend` works
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Ensure project root (telepets-platform) is importable so `import backend` works
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 # Also add backend/ to support imports like `from config.settings import ...`
@@ -103,12 +103,11 @@ def run_migrations_online() -> None:
         connect_args=connect_args,
     )
 
+    should_precreate = os.getenv("ALEMBIC_CREATE_BASELINE") == "1"
+
     def _do_run_migrations(sync_connection):
-        # Гарантируем наличие базовых таблиц из моделей перед применением миграций
-        try:
+        if should_precreate:
             Base.metadata.create_all(sync_connection)
-        except Exception:
-            pass
         context.configure(connection=sync_connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()

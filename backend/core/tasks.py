@@ -8,6 +8,7 @@ from services.cache_service import CacheService
 from services.pet_summary import PetSummaryService
 from services.cache_service import CacheService
 from services.pet_summary import PetSummaryService
+from services.health_engine import HealthEngine
 from config.settings import (
     HEALTH_DOWN_INTERVALS, 
     HEALTH_DOWN_AMOUNTS, 
@@ -51,13 +52,25 @@ async def decrease_health_task():
                 
                 for pet in pets:
                     try:
-                        # Получаем интервал и количество уменьшения для текущей стадии
-                        interval = HEALTH_DOWN_INTERVALS.get(pet.state.value, 60)
-                        decrease_amount = HEALTH_DOWN_AMOUNTS.get(pet.state.value, 5)
-                        
-                        # Уменьшаем здоровье
                         old_health = pet.health
-                        pet.health = max(HEALTH_MIN, pet.health - decrease_amount)
+                        health_result = await HealthEngine.process_pet(db, pet)
+
+                        if health_result.characteristics_snapshot:
+                            try:
+                                from api.websocket import broadcast_pet_update
+                                await broadcast_pet_update(
+                                    pet.user_id,
+                                    "characteristics_changed",
+                                    {
+                                        "pet_id": pet.id,
+                                        "pet_name": pet.name,
+                                        "characteristics": health_result.characteristics_snapshot,
+                                    },
+                                )
+                            except Exception as ws_error:
+                                logger.warning(f"Ошибка отправки характеристик через WS: {ws_error}")
+
+                        health_changed = pet.health != old_health
                         
                         # Проверяем смерть питомца
                         if pet.health <= HEALTH_MIN:
@@ -127,7 +140,7 @@ async def decrease_health_task():
                                 logger.warning(f"Ошибка отправки WebSocket обновления при смерти питомца: {ws_error}")
                         
                         # Проверяем низкое здоровье
-                        elif pet.health <= HEALTH_LOW:
+                        elif health_changed and pet.health <= HEALTH_LOW:
                             # Создаем уведомление о низком здоровье
                             low_health_message = f"Здоровье питомца {pet.name} критически низкое: {pet.health}/{HEALTH_MAX}"
                             notification = Notification(
@@ -236,6 +249,18 @@ async def decrease_health_task():
                                 except Exception:
                                     pass
                         
+                        if health_changed:
+                            try:
+                                from api.websocket import broadcast_pet_update
+                                await broadcast_pet_update(pet.user_id, "health_changed", {
+                                    "pet_id": pet.id,
+                                    "pet_name": pet.name,
+                                    "health": pet.health,
+                                    "health_delta": pet.health - old_health,
+                                    "stage": pet.state.value,
+                                })
+                            except Exception as ws_error:
+                                logger.warning(f"Ошибка отправки WebSocket обновления здоровья: {ws_error}")
                         logger.debug(f"Питомец {pet.name}: здоровье {old_health} -> {pet.health}")
                         
                     except Exception as e:

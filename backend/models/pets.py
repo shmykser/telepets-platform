@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -28,6 +30,20 @@ class Pet(Base):
     image_adult_transparent_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=True)
+    health_updated_at = Column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc))
+
+    characteristics = relationship(
+        "PetCharacteristic",
+        back_populates="pet",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    characteristic_events = relationship(
+        "PetCharacteristicEvent",
+        back_populates="pet",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 

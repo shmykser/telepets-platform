@@ -2,10 +2,11 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import React from 'react';
-import { Clock } from 'lucide-react';
-import type { Pet, StageCostMap, SyncTimer } from '@/types';
+import { Clock, Thermometer } from 'lucide-react';
+import type { Pet, StageCostMap, SyncTimer, CharacteristicStatus } from '@/types';
 import useSyncedCountdown from '@/hooks/useSyncedCountdown';
 import { formatCountdown } from '@/utils';
+import { CleanGame, EggDefenseGame, PetThiefGame, TemperatureGame } from '@/components/games';
 
 export interface PetCarouselProps {
   pets?: Pet[];
@@ -37,6 +38,46 @@ const DRAG_BUFFER = 0;
 const VELOCITY_THRESHOLD = 500;
 const GAP = 32;
 const SPRING_OPTIONS = { type: 'spring' as const, stiffness: 300, damping: 30 };
+
+const CHARACTERISTIC_LABELS: Record<string, string> = {
+  temperature: 'Температура',
+  shell_defense: 'Защита',
+  hunger: 'Сытость',
+  cleanliness: 'Чистота',
+  mood: 'Настроение',
+  energy: 'Энергия',
+};
+
+const STATUS_META: Record<CharacteristicStatus, { label: string; text: string; bar: string }> = {
+  normal: {
+    label: 'В норме',
+    text: 'text-emerald-200',
+    bar: 'bg-gradient-to-r from-emerald-400 to-teal-400',
+  },
+  warning: {
+    label: 'Требует ухода',
+    text: 'text-amber-200',
+    bar: 'bg-gradient-to-r from-amber-400 to-orange-400',
+  },
+  critical: {
+    label: 'Критично',
+    text: 'text-rose-200',
+    bar: 'bg-gradient-to-r from-rose-500 to-red-500',
+  },
+};
+
+const formatIntervalLabel = (seconds?: number) => {
+  if (!seconds) return '—';
+  if (seconds >= 3600) {
+    const hours = Math.round(seconds / 3600);
+    return `${hours} ч`;
+  }
+  if (seconds >= 120) {
+    const minutes = Math.round(seconds / 60);
+    return `${minutes} мин`;
+  }
+  return `${seconds} с`;
+};
 
 // Глобальный кэш для загруженных изображений
 const imageCache = new Set<string>();
@@ -96,6 +137,7 @@ const PetCard = React.memo(({
 }: PetCardProps) => {
   const isCardHovered = hoveredCardId === pet.id?.toString();
   const imgRef = useRef<HTMLImageElement>(null);
+  const isAlive = pet.status === 'alive';
   const [loadingAction, setLoadingAction] = useState<'free' | 'paid' | 'play' | 'resurrect' | null>(null);
   const autoReleaseTimeout = useRef<number | null>(null);
   
@@ -186,6 +228,29 @@ const PetCard = React.memo(({
       : formatCountdown(stageCountdown.secondsLeft)
     : null;
   const showStageTimerBadge = Boolean(!isDead && stageTimer && (stageTimerDisplay || stageTimerReady));
+  const characteristicsEntries = useMemo(() => Object.entries(pet.characteristics ?? {}), [pet.characteristics]);
+  const hasCharacteristics = isAlive && characteristicsEntries.length > 0;
+  const healthTick = pet.health_tick;
+  const healthTrendText = useMemo(() => {
+    if (!healthTick) return null;
+    const interval = formatIntervalLabel(healthTick.interval_seconds);
+    if (healthTick.penalty > 0) {
+      return `-${healthTick.penalty} HP каждые ${interval}`;
+    }
+    if (healthTick.regen_amount > 0) {
+      return `+${healthTick.regen_amount} HP каждые ${interval}`;
+    }
+    return `HP без изменений (${interval})`;
+  }, [healthTick]);
+  const lastTickLabel = useMemo(() => {
+    if (!healthTick?.last_tick_at) return null;
+    const date = new Date(healthTick.last_tick_at);
+    if (Number.isNaN(date.getTime())) return null;
+    return `обновлено ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  }, [healthTick?.last_tick_at]);
+  const getCharacteristicLabel = useCallback((key: string) => {
+    return CHARACTERISTIC_LABELS[key] ?? key.replace(/_/g, ' ');
+  }, []);
 
   const triggerActionFeedback = useCallback(
     (action: 'free' | 'paid' | 'play' | 'resurrect', cb?: () => void, autoReleaseMs?: number) => {
@@ -420,6 +485,42 @@ const PetCard = React.memo(({
             </div>
             <p className="text-xs text-gray-400 mt-1">{healthStatus}</p>
           </div>
+          {healthTick && (
+            <div className="mt-2 text-[11px] text-gray-400 flex justify-between items-center gap-2 flex-wrap">
+              <span className={healthTick.penalty > 0 ? 'text-rose-200 font-semibold' : 'text-emerald-200 font-semibold'}>
+                {healthTrendText}
+              </span>
+              {lastTickLabel && <span className="text-gray-500">{lastTickLabel}</span>}
+            </div>
+          )}
+
+          {hasCharacteristics && (
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              {characteristicsEntries.map(([key, snapshot]) => {
+                const statusMeta = STATUS_META[(snapshot.status as CharacteristicStatus) ?? 'normal'];
+                const valuePercent = Math.round(snapshot.value ?? 0);
+                return (
+                  <div
+                    key={key}
+                    className="p-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-gray-300 mb-1">
+                      <span className="truncate">{getCharacteristicLabel(key)}</span>
+                      <span className="text-white font-semibold">{valuePercent}%</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        className={`h-full ${statusMeta.bar}`}
+                        animate={{ width: `${valuePercent}%` }}
+                        transition={{ duration: 0.4 }}
+                      />
+                    </div>
+                    <p className={`text-[10px] mt-1 ${statusMeta.text}`}>{statusMeta.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {isDead ? (
             <motion.button
@@ -462,7 +563,7 @@ const PetCard = React.memo(({
               )}
             </motion.button>
           ) : (
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
               <motion.button
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
                 style={{
@@ -537,6 +638,29 @@ const PetCard = React.memo(({
                 {withPressOverlay('play', isPlayPending)}
                 {isPlayBusy ? renderSpinner() : <span className="relative z-10">🎮</span>}
               </motion.button>
+              <TemperatureGame
+                pet={pet}
+                className="flex-1 min-w-[44px]"
+                trigger={
+                  <motion.button
+                    type="button"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] flex items-center justify-center gap-2"
+                    style={{
+                      backgroundImage: 'linear-gradient(90deg, #fb923c, #f97316, #ef4444, #fb923c)',
+                      backgroundSize: '200% 100%'
+                    }}
+                    animate={{
+                      backgroundPosition: ['0%', '100%', '0%']
+                    }}
+                    transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 1.2 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Thermometer className="w-4 h-4" />
+                    <span className="relative z-10">Температура</span>
+                  </motion.button>
+                }
+              />
             </div>
           )}
         </div>
@@ -552,22 +676,41 @@ const PetCard = React.memo(({
           zIndex: 20
         }}
       >
-        <div className={`px-3 py-1.5 rounded-full backdrop-blur-md border ${
-          isDead 
-            ? 'bg-red-500/30 border-red-500/50' 
-            : 'bg-green-500/30 border-green-500/50'
-        }`}
-        style={{
-          boxShadow: '0 15px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-        }}>
-          <span className="text-white text-xs font-semibold">
-            {isDead ? '💀 Мёртв' : `❤️ ${healthPercentage}%`}
-          </span>
-        </div>
+        {(() => {
+          const badgeContent = (
+            <div
+              className={`px-3 py-1.5 rounded-full backdrop-blur-md border ${
+                isDead ? 'bg-red-500/30 border-red-500/50' : 'bg-green-500/30 border-green-500/50'
+              }`}
+              style={{
+                boxShadow:
+                  '0 15px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              <span className="text-white text-xs font-semibold">
+                {isDead ? '💀 Мёртв' : `❤️ ${healthPercentage}%`}
+              </span>
+            </div>
+          );
+
+          if (!isAlive) {
+            return badgeContent;
+          }
+
+          if (pet.state === 'egg') {
+            return <TemperatureGame pet={pet} trigger={badgeContent} className="block" />;
+          }
+
+          if (pet.state === 'baby') {
+            return <CleanGame pet={pet} trigger={badgeContent} className="block" />;
+          }
+
+          return badgeContent;
+        })()}
       </div>
 
       <div 
-        className="absolute left-7 flex items-center gap-2 sm:gap-3"
+        className="absolute left-7"
         style={{
           top: '7%',
           transform: 'translateZ(80px)',
@@ -575,32 +718,56 @@ const PetCard = React.memo(({
           zIndex: 20
         }}
       >
-        <div 
-          className="px-3 py-1.5 rounded-full backdrop-blur-md bg-white/10 border border-white/20"
-          style={{
-            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3)'
-          }}
-        >
-          <span className="text-white text-lg">{stageInfo.emoji}</span>
-        </div>
-        <div className="flex flex-col">
-          <h3 
-            className="text-white text-base sm:text-lg font-bold leading-tight"
-            style={{
-              textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
-            }}
-          >
-            {pet.name}
-          </h3>
-          <p 
-            className="text-gray-300 text-xs leading-tight"
-            style={{
-              textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
-            }}
-          >
-            {stageInfo.name}
-          </p>
-        </div>
+        {(() => {
+          const badgeContent = (
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div
+                className="px-3 py-1.5 rounded-full backdrop-blur-md bg-white/10 border border-white/20"
+                style={{
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <span className="text-white text-lg">{stageInfo.emoji}</span>
+              </div>
+              <div className="flex flex-col">
+                <h3
+                  className="text-white text-base sm:text-lg font-bold leading-tight"
+                  style={{
+                    textShadow:
+                      '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {pet.name}
+                </h3>
+                <p
+                  className="text-gray-300 text-xs leading-tight"
+                  style={{
+                    textShadow:
+                      '1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {stageInfo.name}
+                </p>
+              </div>
+            </div>
+          );
+
+          if (!isAlive) {
+            return badgeContent;
+          }
+
+          if (pet.state === 'egg') {
+            return <EggDefenseGame pet={pet} trigger={badgeContent} className="block" />;
+          }
+
+          if (pet.state === 'baby') {
+            return (
+              <PetThiefGame pet={pet} trigger={badgeContent} className="block" comingSoon />
+            );
+          }
+
+          return badgeContent;
+        })()}
       </div>
     </motion.div>
   );

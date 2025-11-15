@@ -5,7 +5,8 @@
 | Сервис | Dev Mode | Prod Mode | Описание |
 |--------|----------|-----------|----------|
 | **WebApp (React)** | `http://localhost:3001` | `http://localhost:8080/` | Основное приложение Telepets |
-| **Games (Phaser)** | `http://localhost:5174/games/` | `http://localhost:8080/games/` | Игровой движок (Pet Thief, Egg Defense) |
+| **Games (Phaser)** | `http://localhost:5174/games/` | `http://localhost:8080/games/` | Новый пакет мини-игр (React + Phaser vNext) |
+| **Games Legacy** | см. `games_old` | см. `games_old` | Архивный проект (Pet Thief, Egg Defense) для референса |
 | **Backend API** | `http://localhost:3000` (direct)<br/>`http://localhost:8080/api` (via Nginx) | `http://localhost:8080/api` | FastAPI backend |
 | **Pet Images** | `http://localhost:8080/pet-images` | `http://localhost:8080/pet-images` | Изображения питомцев |
 | **Nginx (Gateway)** | `http://localhost:8080` | `http://localhost:8080` | Reverse proxy & static files |
@@ -27,7 +28,11 @@ telepets-platform/frontends/webapp/src/config/endpoints.ts
    - Dev server: `port: 3001`
    - Прокси для API: `/api` → `http://127.0.0.1:3000`
 
-2. **Games:** `games/vite.config.js`
+2. **Games (vNext):** `games/vite.config.ts`
+   - Dev server: `port: 5174`
+   - Base path: `/games/`
+
+3. **Games Legacy (read-only):** `games_old/vite.config.js`
    - Dev server: `port: 5174`
    - Base path: `/games/`
 
@@ -37,7 +42,8 @@ telepets-platform/frontends/webapp/src/config/endpoints.ts
 - Порт: `80` (внутри Docker, маппится на `8080`)
 - Routes:
   - `/` → WebApp static
-  - `/games/` → Games static
+  - `/games/` → Games static (новый проект)
+  - `/games_old/` → Legacy static
   - `/api/` → Backend proxy
   - `/pet-images/` → Backend proxy
 
@@ -119,6 +125,8 @@ const gameUrl = buildUrl.game({
 })
 ```
 
+> ⚠️ Пока сцена PetThief не перенесена в новый пакет, используйте URL вида `/games_old/petthief.html?...`.
+
 ---
 
 ## 🌐 Режимы окружения
@@ -134,6 +142,7 @@ const gameUrl = buildUrl.game({
 - Все: `localhost:8080` (или домен prod)
 - WebApp: `/` → статика из `/usr/share/nginx/html/webapp/`
 - Games: `/games/` → статика из `/usr/share/nginx/html/games/`
+- Games Legacy: `/games_old/` → статика из `/usr/share/nginx/html/games_old/`
 - API: `/api/` → proxy to `backend:8000`
 - Минификация ✅
 - Кэширование ✅

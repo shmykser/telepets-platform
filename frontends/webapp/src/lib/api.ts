@@ -14,6 +14,7 @@ import type {
   UpdateProfileRequest,
   PublicUserInfo,
   TimerSummary,
+  CharacteristicActionResponse,
 } from '@/types'
 import { buildUrl } from '@/config/endpoints'
 import { getStoredUsername } from '@/utils'
@@ -121,6 +122,19 @@ export const petApi = {
       params: { pet_name }
     })
     return response.data?.pet_info as HealthUpResponse
+  },
+
+  applyCharacteristicAction: async (
+    user_id: string,
+    pet_id: number | string,
+    payload: { action_key: string; value?: number; metadata?: Record<string, unknown> }
+  ): Promise<CharacteristicActionResponse> => {
+    const response = await api.post<CharacteristicActionResponse>(
+      `/pets/${pet_id}/characteristics/apply`,
+      payload,
+      { params: { user_id } }
+    )
+    return response.data
   },
 }
 

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from core.db import init_db
 from api import create, health_up, summary, economy
-from api import monitoring, debug, pet_images
+from api import monitoring, debug, pet_images, pet_characteristics
 from api import auth_api
 from api import market
 from api import user_profile, games
@@ -220,6 +220,7 @@ app.include_router(user_profile.router, prefix="/api")
 app.include_router(games.router, prefix="/api/games", tags=["games"])
 app.include_router(websocket.router, prefix="/api")
 app.include_router(timers.router, prefix="/api")
+app.include_router(pet_characteristics.router, prefix="/api")
 
 # Служебные роутеры (без /api префикса)
 app.include_router(monitoring.router)

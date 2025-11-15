@@ -1,0 +1,178 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vw, 32px);
+}
+
+.hero {
+  background: rgba(17, 24, 39, 0.65);
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 32px);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.35);
+}
+
+.hero h1 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 3.2vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.hero p {
+  margin: 0;
+  font-size: clamp(16px, 2vw, 18px);
+  color: rgba(226, 232, 240, 0.72);
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(20px, 3vw, 28px);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.78), rgba(15, 23, 42, 0.92));
+  border: 1px solid rgba(100, 116, 139, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px rgba(2, 6, 23, 0.4);
+}
+
+.cardBody h2 {
+  margin: 8px 0;
+  font-size: clamp(20px, 2.4vw, 24px);
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.cardBody p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.7);
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: rgba(191, 219, 254, 0.9);
+}
+
+.status[data-status='prototype'] {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: rgba(125, 211, 252, 0.9);
+}
+
+.status[data-status='planned'] {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: rgba(253, 224, 71, 0.85);
+}
+
+.status[data-status='legacy'] {
+  border-color: rgba(148, 163, 184, 0.5);
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.status[data-status='in-progress'] {
+  border-color: rgba(110, 231, 183, 0.4);
+  color: rgba(134, 239, 172, 0.9);
+}
+
+.cardFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.primaryLink {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.32), rgba(236, 72, 153, 0.32));
+  color: rgba(248, 250, 252, 0.92);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.primaryLink:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.2);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(236, 72, 153, 0.4));
+}
+
+.stageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stageLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  color: rgba(226, 232, 240, 0.75);
+  text-decoration: none;
+  font-size: 13px;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.stageLink:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  color: rgba(191, 219, 254, 0.95);
+  transform: translateY(-1px);
+}
+
+.emptyState {
+  grid-column: 1 / -1;
+  padding: clamp(32px, 5vw, 48px);
+  text-align: center;
+  background: rgba(17, 24, 39, 0.65);
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.35);
+}
+
+.emptyState p {
+  margin: 0 0 16px;
+  font-size: clamp(16px, 2vw, 18px);
+  color: rgba(226, 232, 240, 0.72);
+  line-height: 1.6;
+}
+
+.emptyState p:last-child {
+  margin-bottom: 0;
+  font-size: clamp(14px, 1.8vw, 16px);
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.emptyState code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  color: rgba(191, 219, 254, 0.9);
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
+}
+

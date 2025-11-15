@@ -165,6 +165,10 @@ async def websocket_pets(
         "http://localhost:5173",
         "http://localhost:8080",
         "https://telepets-frontend.onrender.com",
+        "https://web.telegram.org",
+        "https://web.telegram.org/a",
+        "https://telegram.org",
+        "https://appassets.telegram.org",
     ]
     
     # Проверяем origin через regex для GitHub Pages

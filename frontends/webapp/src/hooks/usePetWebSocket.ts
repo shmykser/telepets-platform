@@ -12,7 +12,16 @@ import { getStoredUserId } from '@/utils'
 import { buildUrl } from '@/config/endpoints'
 
 interface WebSocketMessage {
-  type: 'pets_update' | 'pet_created' | 'health_changed' | 'stage_changed' | 'wallet_updated' | 'auctions_updated' | 'ping' | 'error'
+  type:
+    | 'pets_update'
+    | 'pet_created'
+    | 'health_changed'
+    | 'characteristics_changed'
+    | 'stage_changed'
+    | 'wallet_updated'
+    | 'auctions_updated'
+    | 'ping'
+    | 'error'
   data: any
   timestamp?: string
 }
@@ -73,14 +82,45 @@ function handleWebSocketMessage(event: MessageEvent, userId: string) {
           queryClient.invalidateQueries({ queryKey: ['pet', userId] })
           break
 
-        case 'health_changed':
+        case 'health_changed': {
+          const patch = message.data ?? {}
+          queryClient.setQueryData(['allPets', userId], (oldData: any) => {
+            if (!oldData?.pets) return oldData
+            const updatedPets = oldData.pets.map((p: any) => {
+              const match = p.id === patch.pet_id || p.name === patch.pet_name
+              if (!match) return p
+              return {
+                ...p,
+                health: typeof patch.health === 'number' ? patch.health : p.health,
+                state: patch.stage || p.state,
+                updated_at: message.timestamp || new Date().toISOString(),
+              }
+            })
+            return { ...oldData, pets: updatedPets }
+          })
+          queryClient.setQueryData(['pet', userId], (oldData: any) => {
+            if (!oldData || (oldData.id !== patch.pet_id && oldData.name !== patch.pet_name)) {
+              return oldData
+            }
+            return {
+              ...oldData,
+              health: typeof patch.health === 'number' ? patch.health : oldData.health,
+              state: patch.stage || oldData.state,
+            }
+          })
+          break
+        }
+
+        case 'characteristics_changed': {
+          const snapshot = message.data?.characteristics
+          if (!snapshot) break
           queryClient.setQueryData(['allPets', userId], (oldData: any) => {
             if (!oldData?.pets) return oldData
             return {
               ...oldData,
               pets: oldData.pets.map((p: any) =>
                 p.id === message.data.pet_id || p.name === message.data.pet_name
-                  ? { ...p, ...message.data, updated_at: message.timestamp || new Date().toISOString() }
+                  ? { ...p, characteristics: snapshot }
                   : p
               ),
             }
@@ -91,11 +131,11 @@ function handleWebSocketMessage(event: MessageEvent, userId: string) {
             }
             return {
               ...oldData,
-              health: message.data.health,
-              stage: message.data.stage || oldData.stage,
+              characteristics: snapshot,
             }
           })
           break
+        }
 
         case 'stage_changed':
           console.log('🔄 [WebSocket] Переход стадии:', message.data)
@@ -272,7 +312,7 @@ export function usePetWebSocket() {
   const queryClient = useQueryClient()
   const userId = getStoredUserId()
   const [isConnected, setIsConnected] = useState(globalIsConnected)
-  const subscriberRef = useRef<() => void>()
+  const subscriberRef = useRef<() => void>(() => {})
 
   // Подписываемся на изменения состояния
   useEffect(() => {
