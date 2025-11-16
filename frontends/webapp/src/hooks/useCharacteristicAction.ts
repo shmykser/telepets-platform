@@ -7,7 +7,8 @@ import { notifyError, notifySuccess } from '@/components/Notification'
 
 interface ApplyArgs {
   actionKey: string
-  value?: number
+  delta?: number
+  targetValue?: number
   metadata?: Record<string, unknown>
   successMessage?: string
 }
@@ -16,7 +17,7 @@ export function useCharacteristicAction(pet?: Pet) {
   const userId = useMemo(() => getStoredUserId(), [])
 
   const mutation = useMutation({
-    mutationFn: async ({ actionKey, value, metadata }: ApplyArgs) => {
+    mutationFn: async ({ actionKey, delta, targetValue, metadata }: ApplyArgs) => {
       if (!pet?.id) {
         throw new Error('Питомец не найден')
       }
@@ -25,7 +26,8 @@ export function useCharacteristicAction(pet?: Pet) {
       }
       return petApi.applyCharacteristicAction(userId, pet.id, {
         action_key: actionKey,
-        value,
+        delta,
+        target_value: targetValue,
         metadata,
       })
     },

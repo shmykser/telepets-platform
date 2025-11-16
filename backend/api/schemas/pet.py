@@ -46,7 +46,9 @@ class PetCharacteristicsResponse(BaseModel):
 
 class CharacteristicActionRequest(BaseModel):
     action_key: str
-    value: Optional[int] = None
+    delta: Optional[int] = None
+    target_value: Optional[int] = None
+    value: Optional[int] = None  # deprecated, оставлено для обратной совместимости
     metadata: Optional[Dict[str, Any]] = None
 
 

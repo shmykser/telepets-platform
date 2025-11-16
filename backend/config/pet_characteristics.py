@@ -5,11 +5,11 @@ PET_CHARACTERISTICS = {
         'temperature': {
             'display_name': 'Температура',
             'unit': '°C',
-            'range': {'min': 0, 'max': 100},
-            'normal': {'min': 60, 'max': 85},
-            'decay_per_interval': 2,
+            'range': {'min': 20, 'max': 65},
+            'normal': {'min': 26, 'max': 42},
+            'decay_per_interval': 1,
             'recovery': {'temperature_game': 30},
-            'penalty': {'below': 55, 'value': 5},
+            'penalty': {'value': 5},
         },
         'shell_defense': {
             'display_name': 'Защита скорлупы',
@@ -17,8 +17,15 @@ PET_CHARACTERISTICS = {
             'range': {'min': 0, 'max': 100},
             'normal': {'min': 70, 'max': 100},
             'decay_per_interval': 1,
-            'recovery': {'egg_defense_game': 25},
-            'penalty': {'below': 60, 'value': 5},
+            'recovery': {
+                # Базовое действие мини-игры (для обратной совместимости)
+                'egg_defense_game': 25,
+                # Результат мини-игры EggDefense: победа/поражение
+                # Значения трактуются как процентные пункты к 0..100
+                'egg_defense_game_win': 30,   # +30% по умолчанию
+                'egg_defense_game_lose': -20, # -20% по умолчанию
+            },
+            'penalty': {'value': 5},
         },
     },
     'baby': {
@@ -29,7 +36,7 @@ PET_CHARACTERISTICS = {
             'normal': {'min': 70, 'max': 100},
             'decay_per_interval': 4,
             'recovery': {'feed_action': 40},
-            'penalty': {'below': 50, 'value': 5},
+            'penalty': {'value': 5},
         },
         'cleanliness': {
             'display_name': 'Чистота',
@@ -38,7 +45,7 @@ PET_CHARACTERISTICS = {
             'normal': {'min': 65, 'max': 100},
             'decay_per_interval': 3,
             'recovery': {'clean_game': 50},
-            'penalty': {'below': 45, 'value': 5},
+            'penalty': {'value': 5},
         },
     },
     'adult': {
@@ -49,7 +56,7 @@ PET_CHARACTERISTICS = {
             'normal': {'min': 60, 'max': 100},
             'decay_per_interval': 2,
             'recovery': {'play_action': 35},
-            'penalty': {'below': 40, 'value': 4},
+            'penalty': {'value': 4},
         },
         'energy': {
             'display_name': 'Энергия',
@@ -58,14 +65,14 @@ PET_CHARACTERISTICS = {
             'normal': {'min': 50, 'max': 100},
             'decay_per_interval': 3,
             'recovery': {'rest_action': 45},
-            'penalty': {'below': 35, 'value': 4},
+            'penalty': {'value': 4},
         },
     },
 }
 
 HEALTH_DEGRADATION_RULES = {
     'egg': {
-        'interval_seconds': 600,
+        'interval_seconds': 60,
         'base_drop': 0,
         'regen_amount': 2,
         'penalties': {
@@ -100,6 +107,17 @@ CHARACTERISTIC_ACTIONS = {
         'type': 'mini_game',
     },
     'egg_defense_game': {
+        'stage': 'egg',
+        'characteristic': 'shell_defense',
+        'type': 'mini_game',
+    },
+    # Специальные действия под результаты мини-игры EggDefense
+    'egg_defense_game_win': {
+        'stage': 'egg',
+        'characteristic': 'shell_defense',
+        'type': 'mini_game',
+    },
+    'egg_defense_game_lose': {
         'stage': 'egg',
         'characteristic': 'shell_defense',
         'type': 'mini_game',

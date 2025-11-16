@@ -127,7 +127,12 @@ export const petApi = {
   applyCharacteristicAction: async (
     user_id: string,
     pet_id: number | string,
-    payload: { action_key: string; value?: number; metadata?: Record<string, unknown> }
+    payload: {
+      action_key: string
+      delta?: number
+      target_value?: number
+      metadata?: Record<string, unknown>
+    }
   ): Promise<CharacteristicActionResponse> => {
     const response = await api.post<CharacteristicActionResponse>(
       `/pets/${pet_id}/characteristics/apply`,

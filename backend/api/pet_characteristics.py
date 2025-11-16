@@ -56,7 +56,8 @@ async def apply_characteristic_action(
             db,
             pet,
             action_key=request.action_key,
-            value=request.value,
+            delta=request.delta,
+            target_value=request.target_value or request.value,
             metadata=request.metadata,
         )
     except ValueError as exc:

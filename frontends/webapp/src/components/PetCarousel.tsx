@@ -6,7 +6,7 @@ import { Clock, Thermometer } from 'lucide-react';
 import type { Pet, StageCostMap, SyncTimer, CharacteristicStatus } from '@/types';
 import useSyncedCountdown from '@/hooks/useSyncedCountdown';
 import { formatCountdown } from '@/utils';
-import { CleanGame, EggDefenseGame, PetThiefGame, TemperatureGame } from '@/components/games';
+import { CleanGame, EggDefenseGame, EggDefencePhaser, PetThiefGame, TemperatureGame } from '@/components/games';
 
 export interface PetCarouselProps {
   pets?: Pet[];
@@ -614,30 +614,64 @@ const PetCard = React.memo(({
                 {withPressOverlay('paid', isPaidPending)}
                 {isPaidBusy ? renderSpinner() : <span className="relative z-10">{paidCostLabel}</span>}
               </motion.button>
-              <motion.button
-                className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
-                style={{
-                  backgroundImage: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
-                  backgroundSize: '200% 100%'
-                }}
-                animate={{
-                  backgroundPosition: ['0%', '100%', '0%'],
-                  scale: isPlayBusy ? 0.95 : 1
-                }}
-                transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 1 }}
-                whileHover={!isPlayBusy ? { scale: 1.06 } : {}}
-                whileTap={!isPlayBusy ? { scale: 0.92 } : {}}
-                disabled={isPlayBusy}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  triggerActionFeedback('play', () => onPlay?.(pet), 250);
-                }}
-                aria-pressed={isPlayPending}
-                aria-busy={isPlayBusy}
-              >
-                {withPressOverlay('play', isPlayPending)}
-                {isPlayBusy ? renderSpinner() : <span className="relative z-10">🎮</span>}
-              </motion.button>
+              {(pet.state === 'egg') ? (
+                <EggDefencePhaser
+                  pet={pet}
+                  className="flex-1 min-w-[44px]"
+                  startWave={2}
+                  trigger={
+                    <motion.button
+                      className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
+                      style={{
+                        backgroundImage: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
+                        backgroundSize: '200% 100%'
+                      }}
+                      animate={{
+                        backgroundPosition: ['0%', '100%', '0%'],
+                        scale: isPlayBusy ? 0.95 : 1
+                      }}
+                      transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 1 }}
+                      whileHover={!isPlayBusy ? { scale: 1.06 } : {}}
+                      whileTap={!isPlayBusy ? { scale: 0.92 } : {}}
+                      disabled={isPlayBusy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerActionFeedback('play', undefined, 250);
+                      }}
+                      aria-pressed={isPlayPending}
+                      aria-busy={isPlayBusy}
+                    >
+                      {withPressOverlay('play', isPlayPending)}
+                      {isPlayBusy ? renderSpinner() : <span className="relative z-10">🎮</span>}
+                    </motion.button>
+                  }
+                />
+              ) : (
+                <motion.button
+                  className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold relative overflow-hidden text-white min-h-[44px] min-w-[44px] disabled:cursor-not-allowed disabled:opacity-60 transition-transform duration-150"
+                  style={{
+                    backgroundImage: 'linear-gradient(90deg, #10b981, #34d399, #06b6d4, #10b981)',
+                    backgroundSize: '200% 100%'
+                  }}
+                  animate={{
+                    backgroundPosition: ['0%', '100%', '0%'],
+                    scale: isPlayBusy ? 0.95 : 1
+                  }}
+                  transition={{ duration: 6, repeat: Infinity, ease: 'linear', delay: 1 }}
+                  whileHover={!isPlayBusy ? { scale: 1.06 } : {}}
+                  whileTap={!isPlayBusy ? { scale: 0.92 } : {}}
+                  disabled={isPlayBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerActionFeedback('play', () => onPlay?.(pet), 250);
+                  }}
+                  aria-pressed={isPlayPending}
+                  aria-busy={isPlayBusy}
+                >
+                  {withPressOverlay('play', isPlayPending)}
+                  {isPlayBusy ? renderSpinner() : <span className="relative z-10">🎮</span>}
+                </motion.button>
+              )}
               <TemperatureGame
                 pet={pet}
                 className="flex-1 min-w-[44px]"
@@ -757,7 +791,7 @@ const PetCard = React.memo(({
           }
 
           if (pet.state === 'egg') {
-            return <EggDefenseGame pet={pet} trigger={badgeContent} className="block" />;
+            return <EggDefencePhaser pet={pet} trigger={badgeContent} className="block" startWave={2} />;
           }
 
           if (pet.state === 'baby') {

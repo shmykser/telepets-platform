@@ -57,13 +57,18 @@ export function EggDefenseGame({
 
   const config = DIFFICULTY_CONFIG[difficulty];
 
-  const canvasSize = useMemo(
-    () => ({
-      width: isCompactLayout ? 320 : 520,
-      height: isCompactLayout ? 420 : 520
-    }),
-    [isCompactLayout]
-  );
+  const [viewport, setViewport] = useState<{ width: number; height: number }>({
+    width: typeof window !== 'undefined' ? window.innerWidth : 360,
+    height: typeof window !== 'undefined' ? window.innerHeight : 640
+  });
+
+  const canvasSize = useMemo(() => {
+    const target = Math.max(240, Math.min(viewport.width * 0.9, viewport.height * 0.9));
+    return {
+      width: Math.floor(target),
+      height: Math.floor(target)
+    };
+  }, [viewport.height, viewport.width]);
 
   const eggPosition = useMemo(
     () => ({
@@ -250,6 +255,12 @@ export function EggDefenseGame({
         ctx.textBaseline = 'middle';
         ctx.fillText('🐞', enemy.x, enemy.y);
       });
+
+      // draw egg as emoji
+      ctx.font = '64px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🥚', eggPosition.x, eggPosition.y);
     },
     [cleanup, canvasSize.height, canvasSize.width, eggPosition.x, eggPosition.y, status]
   );
@@ -299,6 +310,7 @@ export function EggDefenseGame({
 
     const updateLayout = () => {
       setIsCompactLayout(window.innerWidth < 768);
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
       const rootStyle = getComputedStyle(document.documentElement);
       const top = parseInt(rootStyle.getPropertyValue('--tg-content-safe-area-inset-top') || '0', 10);
       const bottom = parseInt(
@@ -346,7 +358,7 @@ export function EggDefenseGame({
         className="max-w-none"
       >
         <div
-          className="relative flex h-full w-full flex-col gap-6 bg-gradient-to-b from-indigo-950/90 via-slate-950/85 to-slate-950/90 md:flex-row"
+          className="relative flex h-full w-full flex-col bg-gradient-to-b from-black/80 via-black/60 to-black/80"
           style={{
             paddingTop: isCompactLayout ? safeAreaInsets.top + 12 : undefined,
             paddingBottom: isCompactLayout ? safeAreaInsets.bottom + 12 : undefined
@@ -358,83 +370,119 @@ export function EggDefenseGame({
           </div>
 
           <motion.div
-            className={cn(
-              'relative z-10 flex w-full flex-col justify-between gap-5 border-t border-white/5',
-              'bg-gradient-to-br from-slate-950/95 via-slate-900/85 to-slate-950/90 p-5 text-white',
-              'rounded-t-3xl md:rounded-none md:rounded-l-3xl md:max-w-[360px]'
-            )}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            className="relative flex-1 overflow-hidden rounded-[32px]"
+            initial={{ opacity: 0.85 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35 }}
+            style={{ minHeight: '90vh' }}
           >
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-white/60">
-                <Shield className="h-4 w-4 text-amber-300" />
-                <span>Egg Defender</span>
-              </div>
-              <h2 className="text-3xl font-black">
-                Защити {pet.name ?? 'питомца'}
-              </h2>
-              <p className="text-sm text-white/70">
-                Враги движутся к яйцу. Тапайте по ним, чтобы защищать питомца. Держите яйцо в безопасности пока таймер не закончится.
-              </p>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80 backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/60">Сложность</span>
-                  <span className="font-semibold uppercase tracking-wide">{difficulty}</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-black/65 via-black/45 to-black/65" />
+
+            {/* Топ-виджет статуса */}
+            <div className="absolute top-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3 px-4 text-center text-white">
+              <div className="flex items-center gap-3 rounded-full border border-white/20 bg-black/35 px-6 py-2 backdrop-blur-md">
+                <div className="text-[10px] uppercase tracking-[0.35em] text-white/70">
+                  Режим
+                </div>
+                <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                  Egg Defender · {difficulty}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="tabular-nums">{(timeLeft / 1000).toFixed(1)}s</span>
+                  <span className="opacity-50">·</span>
+                  <span className="tabular-nums">{eggHealth}% HP</span>
+                  <span className="opacity-50">·</span>
+                  <span className="tabular-nums">{score} очк.</span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/60">Время</div>
-                <div className="text-2xl font-bold tabular-nums">
-                  {(timeLeft / 1000).toFixed(1)}s
+            {/* Правый вертикальный индикатор (здоровье яйца) */}
+            <div className="absolute right-3 sm:right-6 top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3">
+              <div className="hidden sm:flex flex-col text-end text-[10px] text-white/60">
+                <span>Здоровье</span>
+                <span>{eggHealth}%</span>
+              </div>
+              <div className="relative flex h-56 w-12 flex-col items-center rounded-2xl border border-white/15 bg-white/5 px-2.5 py-4 backdrop-blur-lg">
+                <Shield className="mb-2 h-5 w-5 text-white/80" />
+                <div className="relative h-full w-3 rounded-full bg-white/10">
+                  <motion.div
+                    className="absolute inset-x-0 bottom-0 rounded-full bg-gradient-to-t from-emerald-400 via-teal-400 to-cyan-400"
+                    style={{ height: `${Math.max(0, Math.min(100, eggHealth))}%` }}
+                    transition={{ type: 'spring', stiffness: 160, damping: 20 }}
+                  />
                 </div>
               </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/60">Здоровье</div>
-                <div className="text-2xl font-bold text-emerald-300">{eggHealth}%</div>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/60">Очки</div>
-                <div className="text-2xl font-bold text-cyan-300">{score}</div>
+            </div>
+
+            {/* Низ — прогресс таймера */}
+            <div className="absolute bottom-6 left-0 right-0 z-20 flex w-full justify-center px-6 sm:px-10">
+              <motion.div
+                className="w-full max-w-md rounded-full border border-white/15 bg-black/40 px-6 py-4 backdrop-blur-md"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-gray-200/80">
+                  <span>Раунд</span>
+                  <span>
+                    {Math.round(
+                      Math.max(0, Math.min(1, 1 - timeLeft / DIFFICULTY_CONFIG[difficulty].duration)) * 100
+                    )}
+                    %
+                  </span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-300"
+                    animate={{
+                      width: `${
+                        Math.max(0, Math.min(1, 1 - timeLeft / DIFFICULTY_CONFIG[difficulty].duration)) * 100
+                      }%`
+                    }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                  />
+                </div>
+                <div className="mt-1 text-center text-[10px] text-white/60">
+                  {status === 'playing' ? 'Защищайте яйцо!' : status === 'won' ? 'Раунд завершён' : 'Яйцо разрушено'}
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Игровая сцена (canvas) */}
+            <div className="relative z-10 flex h-full w-full items-center justify-center px-4 pb-4 md:px-8">
+              <div
+                className="relative w-full overflow-hidden rounded-[36px] border border-white/10 bg-black/30 shadow-[0_25px_60px_rgba(0,0,0,0.55)]"
+                style={{ maxWidth: canvasSize.width }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  width={canvasSize.width}
+                  height={canvasSize.height}
+                  className="block w-full"
+                  style={{ touchAction: 'none' }}
+                />
+
+                <AnimatePresence>
+                  {status !== 'playing' && status !== 'idle' && (
+                    <motion.div
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/75 text-center backdrop-blur-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <Target className="h-10 w-10 text-white" />
+                      <p className="text-2xl font-bold">
+                        {status === 'won' ? 'Победа!' : 'Яйцо разрушено'}
+                      </p>
+                      <p className="text-sm text-white/70">
+                        Очки: {score} · Здоровье яйца: {eggHealth}%
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>
-
-          <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-4 md:px-8">
-            <div
-              className="relative w-full overflow-hidden rounded-[36px] border border-white/10 bg-black/30 shadow-[0_25px_60px_rgba(0,0,0,0.55)]"
-              style={{ maxWidth: canvasSize.width }}
-            >
-              <canvas
-                ref={canvasRef}
-                width={canvasSize.width}
-                height={canvasSize.height}
-                className="block w-full"
-                style={{ touchAction: 'none' }}
-              />
-              <AnimatePresence>
-                {status !== 'playing' && status !== 'idle' && (
-                  <motion.div
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/75 text-center backdrop-blur-lg"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <Target className="h-10 w-10 text-white" />
-                    <p className="text-2xl font-bold">
-                      {status === 'won' ? 'Победа!' : 'Яйцо разрушено'}
-                    </p>
-                    <p className="text-sm text-white/70">
-                      Очки: {score} · Здоровье яйца: {eggHealth}%
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
         </div>
       </DialogEnhanced>
     </>

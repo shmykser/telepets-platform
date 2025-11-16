@@ -46,10 +46,13 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
   const [isSwiping, setIsSwiping] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const [safeAreaInsets, setSafeAreaInsets] = useState({ top: 0, bottom: 0 });
-  const characteristicAction = useCharacteristicAction(pet);
-  const [actionApplied, setActionApplied] = useState(false);
+  const { mutate, reset, isPending } = useCharacteristicAction(pet);
+  const [syncing, setSyncing] = useState(false);
 
   const swipeDistance = useRef(0);
+  const syncedTemperatureRef = useRef(initialTemperature);
+  const syncingRef = useRef(false);
+  const heatStateRef = useRef(heatState);
 
   const stageImageUrl = useMemo(() => {
     const url = getStageImageUrl(pet, 'egg', false) ?? pet.image_egg_url ?? pet.image_url;
@@ -64,11 +67,63 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
     swipeSensitivity
   } = temperatureConfig;
 
+  useEffect(() => {
+    syncedTemperatureRef.current = initialTemperature;
+  }, [initialTemperature]);
+
+  useEffect(() => {
+    heatStateRef.current = heatState;
+  }, [heatState]);
+
+  const triggerSync = useCallback(
+    (force = false) => {
+      const state = heatStateRef.current;
+      const targetValue = Math.round(state.temperature);
+      if (!Number.isFinite(targetValue)) return;
+      if (!force && !open) return;
+      if (targetValue <= syncedTemperatureRef.current) return;
+      if (syncingRef.current) return;
+
+      syncingRef.current = true;
+      setSyncing(true);
+
+      mutate(
+        {
+          actionKey: 'temperature_game',
+          targetValue,
+          metadata: {
+            client_progress: Number(state.progress.toFixed(2)),
+            ui_context: 'temperature_game',
+          },
+        },
+        {
+          onSuccess: (response) => {
+            const serverValue =
+              response.characteristics?.temperature?.value ??
+              response.value ??
+              targetValue;
+            syncedTemperatureRef.current = serverValue;
+            setHeatState((prev) => ({
+              temperature: Math.max(prev.temperature, serverValue),
+              progress: prev.progress,
+            }));
+          },
+          onSettled: () => {
+            syncingRef.current = false;
+            setSyncing(false);
+          },
+        }
+      );
+    },
+    [mutate, open]
+  );
+
   const handleClose = useCallback(() => {
+    triggerSync(true);
     setOpen(false);
     setIsSwiping(false);
     swipeDistance.current = 0;
-  }, []);
+  }, [triggerSync]);
 
   const handleTrigger = useCallback(
     (event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>) => {
@@ -185,8 +240,7 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
 
   useEffect(() => {
     if (!open) {
-      setActionApplied(false);
-      characteristicAction.reset();
+      reset();
       return;
     }
 
@@ -197,31 +251,40 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
     return () => {
       window.clearInterval(interval);
     };
-  }, [applyHeatLoss, open]);
+  }, [applyHeatLoss, open, reset, temperatureDecreaseRate]);
+
+  const sessionInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) {
+      sessionInitializedRef.current = false;
+      if (Number.isFinite(initialTemperature)) {
+        syncedTemperatureRef.current = initialTemperature;
+        setHeatState({ temperature: initialTemperature, progress: 0 });
+        heatStateRef.current = { temperature: initialTemperature, progress: 0 };
+      }
+      setIsSwiping(false);
+      swipeDistance.current = 0;
+      return;
+    }
+
+    if (sessionInitializedRef.current) {
+      return;
+    }
+
+    const seed = Number.isFinite(initialTemperature) ? initialTemperature : minTemperature;
+    sessionInitializedRef.current = true;
+    syncedTemperatureRef.current = seed;
+    setHeatState({ temperature: seed, progress: 0 });
+    heatStateRef.current = { temperature: seed, progress: 0 };
+    setIsSwiping(false);
+    swipeDistance.current = 0;
+  }, [initialTemperature, minTemperature, open]);
 
   useEffect(() => {
     if (!open) return;
-    setHeatState({ temperature: initialTemperature, progress: 0 });
-    setIsSwiping(false);
-    swipeDistance.current = 0;
-    setActionApplied(false);
-  }, [open, initialTemperature]);
-
-  useEffect(() => {
-    if (!open || actionApplied) return;
-    if (heatState.temperature >= maxTemperature) {
-      setActionApplied(true);
-      characteristicAction.mutate(
-        {
-          actionKey: 'temperature_game',
-          successMessage: 'Температура яйца восстановлена',
-        },
-        {
-          onError: () => setActionApplied(false),
-        }
-      );
-    }
-  }, [actionApplied, characteristicAction, heatState.temperature, maxTemperature, open]);
+    triggerSync();
+  }, [heatState.progress, heatState.temperature, open, triggerSync]);
 
   const temperaturePercentage = useMemo(() => {
     return Math.min(
@@ -238,6 +301,13 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
   const temperatureDescriptor =
     TEMPERATURE_LABELS.find((label) => heatState.temperature < label.max) ??
     TEMPERATURE_LABELS[TEMPERATURE_LABELS.length - 1];
+
+  const statusMessage =
+    syncing || isPending
+      ? 'Синхронизация...'
+      : isSwiping
+        ? 'Нагрев...'
+        : 'Свайпайте, чтобы поднять температуру';
 
   return (
     <>
@@ -365,9 +435,7 @@ export function TemperatureGame({ pet, trigger, className }: TemperatureGameProp
                     transition={{ duration: 0.25, ease: 'easeOut' }}
                   />
                 </div>
-                <div className="mt-1 text-center text-[10px] text-white/60">
-                  {isSwiping ? 'Нагрев...' : 'Свайпайте, чтобы поднять температуру'}
-                </div>
+                <div className="mt-1 text-center text-[10px] text-white/60">{statusMessage}</div>
               </motion.div>
             </div>
           </motion.div>

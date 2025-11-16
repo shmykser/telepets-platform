@@ -10,8 +10,6 @@ from services.cache_service import CacheService
 from services.pet_summary import PetSummaryService
 from services.health_engine import HealthEngine
 from config.settings import (
-    HEALTH_DOWN_INTERVALS, 
-    HEALTH_DOWN_AMOUNTS, 
     HEALTH_LOW, 
     HEALTH_MIN,
     HEALTH_MAX,

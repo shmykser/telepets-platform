@@ -20,7 +20,6 @@ class CharacteristicDefinition:
     normal_min: int
     normal_max: int
     decay_per_interval: int
-    penalty_threshold: int
     penalty_value: int
 
     @classmethod
@@ -37,7 +36,6 @@ class CharacteristicDefinition:
             normal_min=int(normal.get("min", 0)),
             normal_max=int(normal.get("max", 100)),
             decay_per_interval=int(payload.get("decay_per_interval", 0)),
-            penalty_threshold=int(penalty.get("below", 0)),
             penalty_value=int(penalty.get("value", 0)),
         )
 
@@ -201,6 +199,8 @@ class PetCharacteristicService:
         pet: Pet,
         action_key: str,
         *,
+        delta: Optional[int] = None,
+        target_value: Optional[int] = None,
         value: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -216,16 +216,24 @@ class PetCharacteristicService:
         if not characteristic:
             raise ValueError(f"Действие '{action_key}' не привязано к характеристике")
 
-        delta = cls._resolve_action_delta(pet.state.value, characteristic, action_key)
-        payload = metadata or {}
-        if value is not None:
-            payload = {**payload, "value": value}
+        resolved_target = target_value if target_value is not None else value
+        resolved_delta = delta
+
+        if resolved_target is None and resolved_delta is None:
+            resolved_delta = cls._resolve_action_delta(pet.state.value, characteristic, action_key)
+
+        payload = metadata.copy() if metadata else {}
+        if resolved_delta is not None:
+            payload["requested_delta"] = resolved_delta
+        if resolved_target is not None:
+            payload["requested_target_value"] = resolved_target
 
         return await cls.update_characteristic(
             db,
             pet,
             characteristic,
-            delta=delta,
+            delta=None if resolved_target is not None else resolved_delta,
+            absolute_value=resolved_target,
             reason=f"action:{action_key}",
             source=action_key,
             payload=payload or None,
@@ -248,7 +256,7 @@ class PetCharacteristicService:
         for key, definition in definitions.items():
             current_value = int(values.get(key, definition.normal_max))
             penalty_weight = rule.penalties.get(key, definition.penalty_value)
-            if current_value < definition.penalty_threshold:
+            if current_value < definition.normal_min or current_value > definition.normal_max:
                 total_penalty += penalty_weight
 
         return max(0, total_penalty)
@@ -285,9 +293,9 @@ class PetCharacteristicService:
 
     @staticmethod
     def _resolve_status(definition: CharacteristicDefinition, value: int) -> str:
-        if value >= definition.normal_min:
+        if definition.normal_min <= value <= definition.normal_max:
             return "normal"
-        if value >= definition.penalty_threshold:
+        if definition.range_min <= value <= definition.range_max:
             return "warning"
         return "critical"
 
