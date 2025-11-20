@@ -120,7 +120,16 @@ export function EggDefencePhaser({
 
   // Локальный таймер прогресса (1 Гц) — считаем оставшееся время по startAt+duration
   useEffect(() => {
-    if (!open) return;
+    // Если диалог закрыт, немедленно очищаем таймер и сбрасываем состояние
+    if (!open) {
+      if (roundTimerRef.current) {
+        window.clearInterval(roundTimerRef.current);
+        roundTimerRef.current = null;
+      }
+      setRoundProgressPct(0);
+      setRoundLabel('0%');
+      return;
+    }
     if (!roundStartAt || !roundDurationMs) return;
     if (roundTimerRef.current) {
       window.clearInterval(roundTimerRef.current);
@@ -160,6 +169,11 @@ export function EggDefencePhaser({
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;
+      }
+      // Останавливаем таймер немедленно при закрытии
+      if (roundTimerRef.current) {
+        window.clearInterval(roundTimerRef.current);
+        roundTimerRef.current = null;
       }
       // Шлём событие о выключении игрового режима (для паузы фоновых процессов)
       if (typeof window !== 'undefined') {
